@@ -11,6 +11,7 @@
   .box{background:#1c1c1c;border-radius:10px;padding:12px;margin:10px 0}
   .row{display:flex;justify-content:space-between;padding:4px 0}
   #log{font-size:12px;color:#999;white-space:pre-wrap;max-height:140px;overflow:auto}
+  textarea{width:100%;box-sizing:border-box;font-size:15px;padding:8px;background:#333;color:#eee;border:0;border-radius:6px;margin-top:6px}
   select{font-size:16px;padding:6px;background:#333;color:#eee;border:0;border-radius:6px}
   .file{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px 0;border-top:1px solid #333}
   .file>span{width:100%}
@@ -32,6 +33,7 @@
     <select id="selKat"><option value="standart">Standart</option><option value="bayan">Bayan</option><option value="engelli">Engelli</option><option value="oturarak">Oturarak namaz</option><option value="aci_zorlanan">Açılarda zorlanan</option></select></div>
   <div class="row"><span>Rekat</span>
     <select id="selRek"><option value="">seç…</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="0">belirsiz</option></select></div>
+  <textarea id="txtNot" rows="3" placeholder="Not: özel durumlar, önemli hareketler (kayıt sırasında ya da sonrasında yazabilirsin)"></textarea>
   <button id="bStart" class="" disabled>Kaydı başlat</button>
   <button id="bStop" class="red" disabled>Kaydı bitir</button>
 </div>
@@ -79,11 +81,12 @@ async function setTime(){
 }
 const KAT={standart:'Standart',bayan:'Bayan',engelli:'Engelli',oturarak:'Oturarak namaz',aci_zorlanan:'Açılarda zorlanan'};
 function metas(){try{return JSON.parse(localStorage.getItem('meta')||'[]')}catch(e){return[]}}
-function saveMeta(epoch,kat,rek){const m=metas();m.push({epoch,kat,rek});localStorage.setItem('meta',JSON.stringify(m.slice(-60)))}
+function saveMeta(epoch,kat,rek,not){const m=metas();m.push({epoch,kat,rek,not:not||''});localStorage.setItem('meta',JSON.stringify(m.slice(-60)))}
 function findMeta(epoch){let best=null,bd=1e9;metas().forEach(x=>{const d=Math.abs(x.epoch-epoch);if(d<bd){bd=d;best=x}});return bd<=180?best:null}
+function updLastNote(v){const m=metas();if(m.length){m[m.length-1].not=v;localStorage.setItem('meta',JSON.stringify(m))}}
 const wr=b=>crec.writeValue(new Uint8Array(b));
 
-async function startRec(){if(!$('selRek').value){alert('Önce rekat sayısını seç');return}saveMeta(Math.floor(Date.now()/1000),$('selKat').value,$('selRek').value);await setTime();await cset.writeValue(new Uint8Array([0x41,1,1]));log('kayıt başlatma gönderildi')}
+async function startRec(){if(!$('selRek').value){alert('Önce rekat sayısını seç');return}saveMeta(Math.floor(Date.now()/1000),$('selKat').value,$('selRek').value,$('txtNot').value);await setTime();await cset.writeValue(new Uint8Array([0x41,1,1]));log('kayıt başlatma gönderildi')}
 async function stopRec(){await cset.writeValue(new Uint8Array([0x41,1,0]));log('kayıt bitirme gönderildi')}
 
 function onRec(ev){
@@ -117,7 +120,9 @@ function renderFiles(){
     const m=findMeta(f.epoch)||{kat:$('selKat').value,rek:$('selRek').value};
     const sk=document.createElement('select'); Object.keys(KAT).forEach(k=>{const o=document.createElement('option');o.value=k;o.textContent=KAT[k];if(k===m.kat)o.selected=true;sk.append(o)});
     const sr=document.createElement('select'); ['','2','3','4','0'].forEach(k=>{const o=document.createElement('option');o.value=k;o.textContent=k===''?'rekat seç…':k==='0'?'belirsiz':k+' rekat';if(k===String(m.rek))o.selected=true;sr.append(o)});
-    f.selK=sk;f.selR=sr; el.append(sk,sr);
+    const tn=document.createElement('textarea'); tn.rows=2; tn.placeholder='Not'; tn.value=(m.not||''); tn.style.flex='1 1 100%';
+    tn.oninput=()=>{const mm=metas();const q=mm.find(z=>f.epoch&&Math.abs(z.epoch-f.epoch)<=180);if(q){q.not=tn.value;localStorage.setItem('meta',JSON.stringify(mm))}};
+    f.selK=sk;f.selR=sr;f.selN=tn; el.append(sk,sr,tn);
     const b=document.createElement('button'); b.textContent='İndir'; b.onclick=()=>download(f);
     const x=document.createElement('button'); x.textContent='Sil'; x.className='gray'; x.onclick=async()=>{await wr([3,f.idx]);setTimeout(list,400)};
     el.append(b,x); d.append(el);
@@ -142,12 +147,13 @@ function finishDownload(total){
   const kat=f.selK?f.selK.value:'standart', rek=f.selR?f.selR.value:'0';
   const name='namaz_'+kat+'_'+rek+'rk_'+(f.epoch?new Date(f.epoch*1000).toISOString().replace(/[:.]/g,'-').slice(0,19):('k'+(f.idx+1)));
   save(new Blob([all]),name+'.bin');
-  save(new Blob([toCsv(all,kat,rek)],{type:'text/csv'}),name+'.csv');
+  const not=f.selN?f.selN.value.split(String.fromCharCode(10)).join(' / ').split('#').join(''):'';
+  save(new Blob([toCsv(all,kat,rek,not)],{type:'text/csv'}),name+'.csv');
   log('indirildi: '+name+' (.bin + .csv)'); tx=null;
 }
-function toCsv(b,kat,rek){
+function toCsv(b,kat,rek,not){
   const dv=new DataView(b.buffer), v2=(b[2]===50), RS=v2?11:10, n=Math.floor((b.length-16)/RS), epoch=dv.getUint32(4,true);
-  let s='# epoch_s='+epoch+'\n# kategori='+kat+'\n# rekat='+rek+'\n# surum='+(v2?'NK2':'NK1')+'\nt_s,pitch,roll,sensor_valid,tap,otomod_izliyor,yaka_canli,moving,yol_adimi'+(v2?',hareket_x4':'')+'\n';
+  let s='# epoch_s='+epoch+'\n# kategori='+kat+'\n# rekat='+rek+'\n# not='+(not||'')+'\n# surum='+(v2?'NK2':'NK1')+'\nt_s,pitch,roll,sensor_valid,tap,otomod_izliyor,yaka_canli,moving,yol_adimi'+(v2?',hareket_x4':'')+'\n';
   for(let i=0;i<n;i++){const o=16+i*RS, t=dv.getUint32(o,true), p=dv.getInt16(o+4,true), r=dv.getInt16(o+6,true), fl=dv.getUint8(o+8), st=dv.getUint8(o+9);
     s+=(t/1000).toFixed(2)+','+(p/100).toFixed(2)+','+(r/100).toFixed(2)+','+(fl&1)+','+((fl>>1)&7)+','+((fl>>4)&1)+','+((fl>>5)&1)+','+((fl>>6)&1)+','+st+(v2?','+dv.getUint8(o+10):'')+'\n'}
   return s;
@@ -157,6 +163,7 @@ async function save(blob,name){
   const file=new File([blob],name);
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click();
 }
+$('txtNot').oninput=()=>updLastNote($('txtNot').value);
 $('bConn').onclick=connect; $('bStart').onclick=startRec; $('bStop').onclick=stopRec; $('bList').onclick=list;
 $('bDelAll').onclick=async()=>{if(confirm('Tüm kayıtlar silinsin mi?')){await wr([4]);setTimeout(list,400)}};
 </script>
