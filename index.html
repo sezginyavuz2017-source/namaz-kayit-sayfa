@@ -11,6 +11,7 @@
   .box{background:#1c1c1c;border-radius:10px;padding:12px;margin:10px 0}
   .row{display:flex;justify-content:space-between;padding:4px 0}
   #log{font-size:12px;color:#999;white-space:pre-wrap;max-height:140px;overflow:auto}
+  select{font-size:16px;padding:6px;background:#333;color:#eee;border:0;border-radius:6px}
   .file{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-top:1px solid #333}
 </style>
 </head>
@@ -24,6 +25,10 @@
   <div class="row"><span>Konum</span><b id="sKonum">-</b></div>
 </div>
 <div class="box">
+  <div class="row"><span>Kategori</span>
+    <select id="selKat"><option value="standart">Standart</option><option value="bayan">Bayan</option><option value="engelli">Engelli</option><option value="oturarak">Oturarak namaz</option><option value="aci_zorlanan">Açılarda zorlanan</option></select></div>
+  <div class="row"><span>Rekat</span>
+    <select id="selRek"><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="0">belirsiz</option></select></div>
   <button id="bStart" class="" disabled>Kaydı başlat</button>
   <button id="bStop" class="red" disabled>Kaydı bitir</button>
 </div>
@@ -69,9 +74,13 @@ async function setTime(){
   const e=Math.floor(Date.now()/1000), b=new Uint8Array([0x40,4,e&255,(e>>8)&255,(e>>16)&255,(e>>>24)&255]);
   await cset.writeValue(b);
 }
+const KAT={standart:'Standart',bayan:'Bayan',engelli:'Engelli',oturarak:'Oturarak namaz',aci_zorlanan:'Açılarda zorlanan'};
+function metas(){try{return JSON.parse(localStorage.getItem('meta')||'[]')}catch(e){return[]}}
+function saveMeta(epoch,kat,rek){const m=metas();m.push({epoch,kat,rek});localStorage.setItem('meta',JSON.stringify(m.slice(-60)))}
+function findMeta(epoch){let best=null,bd=1e9;metas().forEach(x=>{const d=Math.abs(x.epoch-epoch);if(d<bd){bd=d;best=x}});return bd<=180?best:null}
 const wr=b=>crec.writeValue(new Uint8Array(b));
 
-async function startRec(){await setTime();await cset.writeValue(new Uint8Array([0x41,1,1]));log('kayıt başlatma gönderildi')}
+async function startRec(){saveMeta(Math.floor(Date.now()/1000),$('selKat').value,$('selRek').value);await setTime();await cset.writeValue(new Uint8Array([0x41,1,1]));log('kayıt başlatma gönderildi')}
 async function stopRec(){await cset.writeValue(new Uint8Array([0x41,1,0]));log('kayıt bitirme gönderildi')}
 
 function onRec(ev){
@@ -99,6 +108,10 @@ function renderFiles(){
     const el=document.createElement('div'); el.className='file';
     const when=f.epoch?new Date(f.epoch*1000).toLocaleString():'(saat yok)';
     el.innerHTML='<span>#'+(f.idx+1)+' '+when+'<br><small>'+Math.round(f.size/100)/10+' KB, ~'+Math.round((f.size-16)/10/10/60*10)/10+' dk</small></span>';
+    const m=findMeta(f.epoch)||{kat:$('selKat').value,rek:$('selRek').value};
+    const sk=document.createElement('select'); Object.keys(KAT).forEach(k=>{const o=document.createElement('option');o.value=k;o.textContent=KAT[k];if(k===m.kat)o.selected=true;sk.append(o)});
+    const sr=document.createElement('select'); ['2','3','4','0'].forEach(k=>{const o=document.createElement('option');o.value=k;o.textContent=k==='0'?'belirsiz':k+' rekat';if(k===String(m.rek))o.selected=true;sr.append(o)});
+    f.selK=sk;f.selR=sr; el.append(sk,sr);
     const b=document.createElement('button'); b.textContent='İndir'; b.onclick=()=>download(f);
     const x=document.createElement('button'); x.textContent='Sil'; x.className='gray'; x.onclick=async()=>{await wr([3,f.idx]);setTimeout(list,400)};
     el.append(b,x); d.append(el);
@@ -112,12 +125,13 @@ async function download(f){
 function finishDownload(total){
   const f=tx.f, all=new Uint8Array(tx.got); let o=0; tx.chunks.forEach(c=>{all.set(c,o);o+=c.length});
   if(tx.bad||tx.got!==total){log('HATA: eksik/sıra bozuk ('+tx.got+'/'+total+'), tekrar dene');tx=null;return}
-  const name='namaz_'+(f.epoch?new Date(f.epoch*1000).toISOString().replace(/[:.]/g,'-').slice(0,19):('k'+(f.idx+1)));
+  const kat=f.selK?f.selK.value:'standart', rek=f.selR?f.selR.value:'0';
+  const name='namaz_'+kat+'_'+rek+'rk_'+(f.epoch?new Date(f.epoch*1000).toISOString().replace(/[:.]/g,'-').slice(0,19):('k'+(f.idx+1)));
   save(new Blob([all]),name+'.bin');
-  save(new Blob([toCsv(all)],{type:'text/csv'}),name+'.csv');
+  save(new Blob([toCsv(all,kat,rek)],{type:'text/csv'}),name+'.csv');
   log('indirildi: '+name+' (.bin + .csv)'); tx=null;
 }
-function toCsv(b){
+function toCsv(b,kat,rek){
   const dv=new DataView(b.buffer), n=Math.floor((b.length-16)/10), epoch=dv.getUint32(4,true);
   let s='# epoch_s='+epoch+'\nt_s,pitch,roll,sensor_valid,tap,otomod_izliyor,yaka_canli,moving,yol_adimi\n';
   for(let i=0;i<n;i++){const o=16+i*10, t=dv.getUint32(o,true), p=dv.getInt16(o+4,true), r=dv.getInt16(o+6,true), fl=dv.getUint8(o+8), st=dv.getUint8(o+9);
