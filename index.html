@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Namaz Kule Kayıt</title>
+<style>
+  body{font-family:system-ui,sans-serif;margin:0;padding:16px;background:#111;color:#eee}
+  button{font-size:18px;padding:14px 18px;margin:6px 4px;border:0;border-radius:10px;background:#2a6;color:#fff}
+  button.red{background:#c33} button.gray{background:#444} button:disabled{opacity:.4}
+  .box{background:#1c1c1c;border-radius:10px;padding:12px;margin:10px 0}
+  .row{display:flex;justify-content:space-between;padding:4px 0}
+  #log{font-size:12px;color:#999;white-space:pre-wrap;max-height:140px;overflow:auto}
+  .file{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-top:1px solid #333}
+</style>
+</head>
+<body>
+<h2>Namaz Kule Kayıt</h2>
+<div class="box">
+  <button id="bConn">Kule'ye bağlan</button>
+  <div class="row"><span>Bağlantı</span><b id="sConn">yok</b></div>
+  <div class="row"><span>Yaka</span><b id="sYaka">-</b></div>
+  <div class="row"><span>Kayıt</span><b id="sRec">-</b></div>
+  <div class="row"><span>Konum</span><b id="sKonum">-</b></div>
+</div>
+<div class="box">
+  <button id="bStart" class="" disabled>Kaydı başlat</button>
+  <button id="bStop" class="red" disabled>Kaydı bitir</button>
+</div>
+<div class="box">
+  <button id="bList" class="gray" disabled>Kayıtları listele</button>
+  <button id="bDelAll" class="gray" disabled>Tümünü sil</button>
+  <div id="files"></div>
+</div>
+<div id="log"></div>
+<script>
+const SVC='4fa10001-e3a3-4101-b423-d62b3b4b9141';
+const C_STATUS='4fa10002-e3a3-4101-b423-d62b3b4b9141';
+const C_SET='4fa10004-e3a3-4101-b423-d62b3b4b9141';
+const C_REC='4fa10006-e3a3-4101-b423-d62b3b4b9141';
+let dev,cs,cset,crec,rx=null,listEntries=[],tx=null;
+const $=id=>document.getElementById(id);
+const log=m=>{$('log').textContent=new Date().toLocaleTimeString()+' '+m+'\n'+$('log').textContent};
+
+function enable(on){['bStart','bStop','bList','bDelAll'].forEach(i=>$(i).disabled=!on)}
+
+async function connect(){
+  try{
+    dev=await navigator.bluetooth.requestDevice({filters:[{services:[SVC]}],optionalServices:[SVC]});
+    dev.addEventListener('gattserverdisconnected',()=>{$('sConn').textContent='koptu';enable(false)});
+    const s=await dev.gatt.connect(); const svc=await s.getPrimaryService(SVC);
+    cs=await svc.getCharacteristic(C_STATUS); cset=await svc.getCharacteristic(C_SET); crec=await svc.getCharacteristic(C_REC);
+    cs.addEventListener('characteristicvaluechanged',onStatus); await cs.startNotifications();
+    crec.addEventListener('characteristicvaluechanged',onRec); await crec.startNotifications();
+    $('sConn').textContent='bağlı'; enable(true);
+    await setTime(); log('saat gönderildi');
+  }catch(e){log('bağlantı hatası: '+e);try{dev&&dev.gatt.connected&&dev.gatt.disconnect()}catch(_){}}
+}
+
+function onStatus(ev){
+  const v=ev.target.value; // 20 bayt
+  const fl=v.getUint8(5), err=v.getUint8(8), batt=v.getUint8(13);
+  $('sYaka').textContent= err==6?'eşleşme bekliyor': err==1||batt==255?'bağlı değil':('bağlı, pil %'+batt);
+  $('sRec').textContent=(fl&0x10)?'KAYITTA':'kapalı';
+  $('sKonum').textContent=['bekliyor','takipte','belirsiz','kayıp','bitti'][v.getUint8(3)]+' / adım '+v.getUint8(2);
+}
+
+async function setTime(){
+  const e=Math.floor(Date.now()/1000), b=new Uint8Array([0x40,4,e&255,(e>>8)&255,(e>>16)&255,(e>>>24)&255]);
+  await cset.writeValue(b);
+}
+const wr=b=>crec.writeValue(new Uint8Array(b));
+
+async function startRec(){await setTime();await cset.writeValue(new Uint8Array([0x41,1,1]));log('kayıt başlatma gönderildi')}
+async function stopRec(){await cset.writeValue(new Uint8Array([0x41,1,0]));log('kayıt bitirme gönderildi')}
+
+function onRec(ev){
+  const v=ev.target.value, t=v.getUint8(0);
+  if(t===0x81){
+    const idx=v.getUint8(1);
+    if(idx===0xFF){listEntries=[];renderFiles();return}
+    const total=v.getUint8(2); listEntries[idx]={idx,size:v.getUint32(3,true),epoch:v.getUint32(7,true)};
+    if(idx===total-1) renderFiles();
+  }else if(t===0x82&&tx){
+    const seq=v.getUint16(1,true);
+    if(seq!==tx.seq){tx.bad=true}
+    tx.seq=seq+1; tx.chunks.push(new Uint8Array(v.buffer.slice(v.byteOffset+3,v.byteOffset+v.byteLength)));
+    tx.got+=v.byteLength-3; $('prog')&&($('prog').textContent=Math.round(100*tx.got/tx.size)+'%');
+  }else if(t===0x83&&tx){
+    const total=v.getUint32(2,true); finishDownload(total);
+  }else if(t===0x84){log('yanıt: komut '+v.getUint8(1)+' durum '+v.getUint8(2))}
+}
+
+async function list(){listEntries=[];await wr([1]);log('liste istendi')}
+function renderFiles(){
+  const d=$('files'); d.innerHTML='';
+  if(!listEntries.length){d.textContent='Kayıt yok.';return}
+  listEntries.forEach(f=>{
+    const el=document.createElement('div'); el.className='file';
+    const when=f.epoch?new Date(f.epoch*1000).toLocaleString():'(saat yok)';
+    el.innerHTML='<span>#'+(f.idx+1)+' '+when+'<br><small>'+Math.round(f.size/100)/10+' KB, ~'+Math.round((f.size-16)/10/10/60*10)/10+' dk</small></span>';
+    const b=document.createElement('button'); b.textContent='İndir'; b.onclick=()=>download(f);
+    const x=document.createElement('button'); x.textContent='Sil'; x.className='gray'; x.onclick=async()=>{await wr([3,f.idx]);setTimeout(list,400)};
+    el.append(b,x); d.append(el);
+  });
+}
+async function download(f){
+  tx={f,size:f.size,got:0,seq:0,chunks:[],bad:false};
+  const p=document.createElement('div'); p.id='prog'; p.textContent='0%'; $('files').prepend(p);
+  await wr([2,f.idx]); log('indirme başladı #'+(f.idx+1));
+}
+function finishDownload(total){
+  const f=tx.f, all=new Uint8Array(tx.got); let o=0; tx.chunks.forEach(c=>{all.set(c,o);o+=c.length});
+  if(tx.bad||tx.got!==total){log('HATA: eksik/sıra bozuk ('+tx.got+'/'+total+'), tekrar dene');tx=null;return}
+  const name='namaz_'+(f.epoch?new Date(f.epoch*1000).toISOString().replace(/[:.]/g,'-').slice(0,19):('k'+(f.idx+1)));
+  save(new Blob([all]),name+'.bin');
+  save(new Blob([toCsv(all)],{type:'text/csv'}),name+'.csv');
+  log('indirildi: '+name+' (.bin + .csv)'); tx=null;
+}
+function toCsv(b){
+  const dv=new DataView(b.buffer), n=Math.floor((b.length-16)/10), epoch=dv.getUint32(4,true);
+  let s='# epoch_s='+epoch+'\nt_s,pitch,roll,sensor_valid,tap,otomod_izliyor,yaka_canli,moving,yol_adimi\n';
+  for(let i=0;i<n;i++){const o=16+i*10, t=dv.getUint32(o,true), p=dv.getInt16(o+4,true), r=dv.getInt16(o+6,true), fl=dv.getUint8(o+8), st=dv.getUint8(o+9);
+    s+=(t/1000).toFixed(2)+','+(p/100).toFixed(2)+','+(r/100).toFixed(2)+','+(fl&1)+','+((fl>>1)&7)+','+((fl>>4)&1)+','+((fl>>5)&1)+','+((fl>>6)&1)+','+st+'\n'}
+  return s;
+}
+async function save(blob,name){
+  const file=new File([blob],name);
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click();
+}
+$('bConn').onclick=connect; $('bStart').onclick=startRec; $('bStop').onclick=stopRec; $('bList').onclick=list;
+$('bDelAll').onclick=async()=>{if(confirm('Tüm kayıtlar silinsin mi?')){await wr([4]);setTimeout(list,400)}};
+</script>
+</body>
+</html>
