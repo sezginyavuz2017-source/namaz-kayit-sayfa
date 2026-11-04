@@ -133,7 +133,7 @@ function finishDownload(total){
 }
 function toCsv(b,kat,rek){
   const dv=new DataView(b.buffer), n=Math.floor((b.length-16)/10), epoch=dv.getUint32(4,true);
-  let s='# epoch_s='+epoch+'\nt_s,pitch,roll,sensor_valid,tap,otomod_izliyor,yaka_canli,moving,yol_adimi\n';
+  let s='# epoch_s='+epoch+'\n# kategori='+kat+'\n# rekat='+rek+'\nt_s,pitch,roll,sensor_valid,tap,otomod_izliyor,yaka_canli,moving,yol_adimi\n';
   for(let i=0;i<n;i++){const o=16+i*10, t=dv.getUint32(o,true), p=dv.getInt16(o+4,true), r=dv.getInt16(o+6,true), fl=dv.getUint8(o+8), st=dv.getUint8(o+9);
     s+=(t/1000).toFixed(2)+','+(p/100).toFixed(2)+','+(r/100).toFixed(2)+','+(fl&1)+','+((fl>>1)&7)+','+((fl>>4)&1)+','+((fl>>5)&1)+','+((fl>>6)&1)+','+st+'\n'}
   return s;
