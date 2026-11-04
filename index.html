@@ -28,7 +28,7 @@
   <div class="row"><span>Kategori</span>
     <select id="selKat"><option value="standart">Standart</option><option value="bayan">Bayan</option><option value="engelli">Engelli</option><option value="oturarak">Oturarak namaz</option><option value="aci_zorlanan">Açılarda zorlanan</option></select></div>
   <div class="row"><span>Rekat</span>
-    <select id="selRek"><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="0">belirsiz</option></select></div>
+    <select id="selRek"><option value="">seç…</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="0">belirsiz</option></select></div>
   <button id="bStart" class="" disabled>Kaydı başlat</button>
   <button id="bStop" class="red" disabled>Kaydı bitir</button>
 </div>
@@ -80,7 +80,7 @@ function saveMeta(epoch,kat,rek){const m=metas();m.push({epoch,kat,rek});localSt
 function findMeta(epoch){let best=null,bd=1e9;metas().forEach(x=>{const d=Math.abs(x.epoch-epoch);if(d<bd){bd=d;best=x}});return bd<=180?best:null}
 const wr=b=>crec.writeValue(new Uint8Array(b));
 
-async function startRec(){saveMeta(Math.floor(Date.now()/1000),$('selKat').value,$('selRek').value);await setTime();await cset.writeValue(new Uint8Array([0x41,1,1]));log('kayıt başlatma gönderildi')}
+async function startRec(){if(!$('selRek').value){alert('Önce rekat sayısını seç');return}saveMeta(Math.floor(Date.now()/1000),$('selKat').value,$('selRek').value);await setTime();await cset.writeValue(new Uint8Array([0x41,1,1]));log('kayıt başlatma gönderildi')}
 async function stopRec(){await cset.writeValue(new Uint8Array([0x41,1,0]));log('kayıt bitirme gönderildi')}
 
 function onRec(ev){
@@ -110,14 +110,14 @@ function renderFiles(){
     el.innerHTML='<span>#'+(f.idx+1)+' '+when+'<br><small>'+Math.round(f.size/100)/10+' KB, ~'+Math.round((f.size-16)/10/10/60*10)/10+' dk</small></span>';
     const m=findMeta(f.epoch)||{kat:$('selKat').value,rek:$('selRek').value};
     const sk=document.createElement('select'); Object.keys(KAT).forEach(k=>{const o=document.createElement('option');o.value=k;o.textContent=KAT[k];if(k===m.kat)o.selected=true;sk.append(o)});
-    const sr=document.createElement('select'); ['2','3','4','0'].forEach(k=>{const o=document.createElement('option');o.value=k;o.textContent=k==='0'?'belirsiz':k+' rekat';if(k===String(m.rek))o.selected=true;sr.append(o)});
+    const sr=document.createElement('select'); ['','2','3','4','0'].forEach(k=>{const o=document.createElement('option');o.value=k;o.textContent=k===''?'rekat seç…':k==='0'?'belirsiz':k+' rekat';if(k===String(m.rek))o.selected=true;sr.append(o)});
     f.selK=sk;f.selR=sr; el.append(sk,sr);
     const b=document.createElement('button'); b.textContent='İndir'; b.onclick=()=>download(f);
     const x=document.createElement('button'); x.textContent='Sil'; x.className='gray'; x.onclick=async()=>{await wr([3,f.idx]);setTimeout(list,400)};
     el.append(b,x); d.append(el);
   });
 }
-async function download(f){
+async function download(f){if(f.selR&&!f.selR.value){alert('Bu kayıt için rekat sayısını seç');return}
   tx={f,size:f.size,got:0,seq:0,chunks:[],bad:false};
   const p=document.createElement('div'); p.id='prog'; p.textContent='0%'; $('files').prepend(p);
   await wr([2,f.idx]); log('indirme başladı #'+(f.idx+1));
