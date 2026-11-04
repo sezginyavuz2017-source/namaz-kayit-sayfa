@@ -95,11 +95,14 @@ function onRec(ev){
     if(idx===total-1) renderFiles();
   }else if(t===0x82&&tx){
     const seq=v.getUint16(1,true);
-    if(seq!==tx.seq){tx.bad=true}
+    tx.last=Date.now();
+    if(tx.waitResume)return;
+    if(seq!==tx.seq){resume('sıra bozuk');return}
     tx.seq=seq+1; tx.chunks.push(new Uint8Array(v.buffer.slice(v.byteOffset+3,v.byteOffset+v.byteLength)));
     tx.got+=v.byteLength-3; $('prog')&&($('prog').textContent=Math.round(100*tx.got/tx.size)+'%');
   }else if(t===0x83&&tx){
-    const total=v.getUint32(2,true); finishDownload(total);
+    const total=v.getUint32(2,true);
+    if(tx.got===total&&!tx.waitResume)finishDownload(total); else resume('eksik');
   }else if(t===0x84){log('yanıt: komut '+v.getUint8(1)+' durum '+v.getUint8(2))}
 }
 
@@ -121,13 +124,21 @@ function renderFiles(){
   });
 }
 async function download(f){if(f.selR&&!f.selR.value){alert('Bu kayıt için rekat sayısını seç');return}
-  tx={f,size:f.size,got:0,seq:0,chunks:[],bad:false};
+  tx={f,size:f.size,got:0,seq:0,chunks:[],bad:false,last:Date.now(),tries:0,waitResume:false};
   const p=document.createElement('div'); p.id='prog'; p.textContent='0%'; $('files').prepend(p);
   await wr([2,f.idx]); log('indirme başladı #'+(f.idx+1));
 }
+async function resume(why){
+  if(!tx)return;
+  if(tx.tries>=6){log('HATA: indirme tamamlanamadı ('+tx.got+'/'+tx.size+')');tx=null;return}
+  tx.tries++; tx.waitResume=true; log('yeniden isteniyor ('+why+') bayt '+tx.got);
+  await wr([2,tx.f.idx,tx.got&255,(tx.got>>8)&255,(tx.got>>16)&255,(tx.got>>>24)&255]);
+  setTimeout(()=>{if(tx){tx.waitResume=false;tx.seq=0;tx.last=Date.now()}},300);
+}
+setInterval(()=>{if(tx&&!tx.waitResume&&Date.now()-tx.last>2000)resume('zaman aşımı')},1000);
 function finishDownload(total){
   const f=tx.f, all=new Uint8Array(tx.got); let o=0; tx.chunks.forEach(c=>{all.set(c,o);o+=c.length});
-  if(tx.bad||tx.got!==total){log('HATA: eksik/sıra bozuk ('+tx.got+'/'+total+'), tekrar dene');tx=null;return}
+  if(tx.got!==total){log('HATA: boyut uyuşmuyor ('+tx.got+'/'+total+')');tx=null;return}
   const kat=f.selK?f.selK.value:'standart', rek=f.selR?f.selR.value:'0';
   const name='namaz_'+kat+'_'+rek+'rk_'+(f.epoch?new Date(f.epoch*1000).toISOString().replace(/[:.]/g,'-').slice(0,19):('k'+(f.idx+1)));
   save(new Blob([all]),name+'.bin');
