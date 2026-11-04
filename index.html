@@ -152,10 +152,10 @@ function finishDownload(total){
   log('indirildi: '+name+' (.bin + .csv)'); tx=null;
 }
 function toCsv(b,kat,rek,not){
-  const dv=new DataView(b.buffer), v2=(b[2]===50), RS=v2?11:10, n=Math.floor((b.length-16)/RS), epoch=dv.getUint32(4,true);
-  let s='# epoch_s='+epoch+'\n# kategori='+kat+'\n# rekat='+rek+'\n# not='+(not||'')+'\n# surum='+(v2?'NK2':'NK1')+'\nt_s,pitch,roll,sensor_valid,tap,otomod_izliyor,yaka_canli,moving,yol_adimi'+(v2?',hareket_x4':'')+'\n';
+  const dv=new DataView(b.buffer), v3=(b[2]===51), v2=(b[2]===50||v3), RS=v3?13:v2?11:10, n=Math.floor((b.length-16)/RS), epoch=dv.getUint32(4,true);
+  let s='# epoch_s='+epoch+'\n# kategori='+kat+'\n# rekat='+rek+'\n# not='+(not||'')+'\n# surum='+(v3?'NK3':v2?'NK2':'NK1')+'\nt_s,pitch,roll,sensor_valid,tap,otomod_izliyor,yaka_canli,moving,yol_adimi'+(v2?',hareket_x4':'')+(v3?',ivme_alt_x100,ivme_ust_x100':'')+'\n';
   for(let i=0;i<n;i++){const o=16+i*RS, t=dv.getUint32(o,true), p=dv.getInt16(o+4,true), r=dv.getInt16(o+6,true), fl=dv.getUint8(o+8), st=dv.getUint8(o+9);
-    s+=(t/1000).toFixed(2)+','+(p/100).toFixed(2)+','+(r/100).toFixed(2)+','+(fl&1)+','+((fl>>1)&7)+','+((fl>>4)&1)+','+((fl>>5)&1)+','+((fl>>6)&1)+','+st+(v2?','+dv.getUint8(o+10):'')+'\n'}
+    s+=(t/1000).toFixed(2)+','+(p/100).toFixed(2)+','+(r/100).toFixed(2)+','+(fl&1)+','+((fl>>1)&7)+','+((fl>>4)&1)+','+((fl>>5)&1)+','+((fl>>6)&1)+','+st+(v2?','+dv.getUint8(o+10):'')+(v3?','+dv.getUint8(o+11)+','+dv.getUint8(o+12):'')+'\n'}
   return s;
 }
 
