@@ -83,6 +83,9 @@ const KAT={standart:'Standart',bayan:'Bayan',engelli:'Engelli',oturarak:'Oturara
 function metas(){try{return JSON.parse(localStorage.getItem('meta')||'[]')}catch(e){return[]}}
 function saveMeta(epoch,kat,rek,not){const m=metas();m.push({epoch,kat,rek,not:not||''});localStorage.setItem('meta',JSON.stringify(m.slice(-60)))}
 function findMeta(epoch){let best=null,bd=1e9;metas().forEach(x=>{const d=Math.abs(x.epoch-epoch);if(d<bd){bd=d;best=x}});return bd<=180?best:null}
+function nKey(f){return f.epoch?('e'+f.epoch):('i'+f.idx+'_'+f.size)}
+function nGet(){try{return JSON.parse(localStorage.getItem('notlar')||'{}')}catch(e){return{}}}
+function nPut(f,o){const a=nGet();const k=nKey(f);a[k]=Object.assign(a[k]||{},o);localStorage.setItem('notlar',JSON.stringify(a))}
 function updLastNote(v){const m=metas();if(m.length){m[m.length-1].not=v;localStorage.setItem('meta',JSON.stringify(m))}}
 const wr=b=>crec.writeValue(new Uint8Array(b));
 
@@ -117,12 +120,17 @@ function renderFiles(){
     const el=document.createElement('div'); el.className='file';
     const when=f.epoch?new Date(f.epoch*1000).toLocaleString():'(saat yok)';
     el.innerHTML='<span>#'+(f.idx+1)+' '+when+'<br><small>'+Math.round(f.size/100)/10+' KB, ~'+Math.round((f.size-16)/10/10/60*10)/10+' dk</small></span>';
-    const m=findMeta(f.epoch)||{kat:$('selKat').value,rek:$('selRek').value};
+    const sv=nGet()[nKey(f)]||{}, m0=findMeta(f.epoch)||{};
+    const m={kat:sv.kat||m0.kat||$('selKat').value, rek:(sv.rek!==undefined?sv.rek:(m0.rek!==undefined?m0.rek:$('selRek').value)), not:(sv.not!==undefined?sv.not:(m0.not||''))};
     const sk=document.createElement('select'); Object.keys(KAT).forEach(k=>{const o=document.createElement('option');o.value=k;o.textContent=KAT[k];if(k===m.kat)o.selected=true;sk.append(o)});
     const sr=document.createElement('select'); ['','2','3','4','0'].forEach(k=>{const o=document.createElement('option');o.value=k;o.textContent=k===''?'rekat seç…':k==='0'?'belirsiz':k+' rekat';if(k===String(m.rek))o.selected=true;sr.append(o)});
     const tn=document.createElement('textarea'); tn.rows=2; tn.placeholder='Not'; tn.value=(m.not||''); tn.style.flex='1 1 100%';
-    tn.oninput=()=>{const mm=metas();const q=mm.find(z=>f.epoch&&Math.abs(z.epoch-f.epoch)<=180);if(q){q.not=tn.value;localStorage.setItem('meta',JSON.stringify(mm))}};
-    f.selK=sk;f.selR=sr;f.selN=tn; el.append(sk,sr,tn);
+const st=document.createElement('small'); st.style.flex='1 1 100%'; st.style.color='#8c8'; st.textContent=(sv.not!==undefined||sv.kat||sv.rek!==undefined)?'✓ kayıtlı':'';
+    const ok=()=>{st.textContent='✓ kaydedildi '+new Date().toLocaleTimeString()};
+    tn.oninput=()=>{nPut(f,{not:tn.value,kat:sk.value,rek:sr.value});ok()};
+    sk.onchange=()=>{nPut(f,{kat:sk.value,not:tn.value,rek:sr.value});ok()};
+    sr.onchange=()=>{nPut(f,{rek:sr.value,kat:sk.value,not:tn.value});ok()};
+    f.selK=sk;f.selR=sr;f.selN=tn; el.append(sk,sr,tn,st);
     const b=document.createElement('button'); b.textContent='İndir'; b.onclick=()=>download(f);
     const x=document.createElement('button'); x.textContent='Sil'; x.className='gray'; x.onclick=async()=>{await wr([3,f.idx]);setTimeout(list,400)};
     el.append(b,x); d.append(el);
