@@ -123,7 +123,7 @@ function updLastNote(v){const m=metas();if(m.length){m[m.length-1].not=v;localSt
 const wr=b=>crec.writeValue(new Uint8Array(b));
 
 async function startRec(){if(!$('selRek').value){alert('Önce rekat sayısını seç');return}saveMeta(Math.floor(Date.now()/1000),$('selKat').value,$('selRek').value,$('txtNot').value);await setTime();await cset.writeValue(new Uint8Array([0x41,1,1]));log('kayıt başlatma gönderildi');setTimeout(()=>{const t=$('txtNot').value;enqueue(async()=>{await setFlag(0xFE,encFlags(0,$('selKat').value,$('selRek').value));if(t)await sendNote(0xFE,t)})},1500)}
-async function stopRec(){const t=$('txtNot').value;if(t)await enqueue(()=>sendNote(0xFE,t));await cset.writeValue(new Uint8Array([0x41,1,0]));log('kayıt bitirme gönderildi')}
+async function stopRec(){const t=$('txtNot').value;if(t)await enqueue(()=>sendNote(0xFE,t));await cset.writeValue(new Uint8Array([0x41,1,0]));log('kayıt bitirme gönderildi');$('txtNot').value='';$('selRek').value=''}
 
 function onRec(ev){
   const v=ev.target.value, t=v.getUint8(0);
