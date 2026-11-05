@@ -50,6 +50,31 @@ const C_SET='4fa10004-e3a3-4101-b423-d62b3b4b9141';
 const C_REC='4fa10006-e3a3-4101-b423-d62b3b4b9141';
 let dev,cs,cset,crec,rx=null,listEntries=[],tx=null;
 const $=id=>document.getElementById(id);
+let opq=Promise.resolve(), waiter=null, recOn=false, noteTmr=null;
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+function enqueue(fn){opq=opq.then(async()=>{while(tx)await sleep(300);return fn()}).catch(e=>log('hata: '+e));return opq}
+function waitFor(kind,ms){return new Promise(res=>{const w={kind,res};waiter=w;setTimeout(()=>{if(waiter===w){waiter=null;res(null)}},ms)})}
+const enc=new TextEncoder(), dec=new TextDecoder('utf-8',{fatal:false});
+function clip(text,max){let b=enc.encode(text);if(b.length<=max)return b;b=b.slice(0,max);while(b.length&&(b[b.length-1]&0xC0)===0x80)b=b.slice(0,-1);if(b.length&&b[b.length-1]>=0xC0)b=b.slice(0,-1);return b}
+async function sendNote(idx,text){
+  const b=clip(text,120); let first=0,o=0;
+  do{const part=b.slice(o,o+100), msg=new Uint8Array(3+part.length); msg[0]=5;msg[1]=idx;msg[2]=first;msg.set(part,3);
+     const p=waitFor('a5',2500); await crec.writeValue(msg); const st=await p; if(st!==0)return false; first=1;o+=100}while(o<b.length);
+  return true}
+async function setFlag(idx,fl){const p=waitFor('a7',2500); await wr([7,idx,fl]); return (await p)===0}
+async function getNote(idx){const p=waitFor('n85',2000); await wr([6,idx]); return p}
+function showFlag(f){if(f.rb)f.rb.textContent=(f.flags&1)?'✓ indirildi':'';if(f.bx)f.bx.className=(f.flags&1)?'red':'gray'}
+async function loadNotes(){
+  let first=true;
+  for(const f of listEntries.slice()){ if(!f)continue;
+    const r=await getNote(f.idx);
+    if(!r){ if(first){log('Kule not/işaret desteklemiyor veya yanıt yok (eski yazılım?)');return} continue}
+    first=false; f.flags=r.flags;
+    const sv=nGet()[nKey(f)]||{};
+    if(f.selN){ if(r.text){ if(document.activeElement!==f.selN)f.selN.value=r.text }
+                else if(sv.not){ f.selN.value=sv.not; const t=sv.not; enqueue(()=>sendNote(f.idx,t)) } }
+    showFlag(f);
+  }}
 const log=m=>{$('log').textContent=new Date().toLocaleTimeString()+' '+m+'\n'+$('log').textContent};
 
 function enable(on){['bStart','bStop','bList','bDelAll'].forEach(i=>$(i).disabled=!on)}
@@ -71,7 +96,7 @@ function onStatus(ev){
   const v=ev.target.value; // 20 bayt
   const fl=v.getUint8(5), err=v.getUint8(8), batt=v.getUint8(13);
   $('sYaka').textContent= err==6?'eşleşme bekliyor': err==1||batt==255?'bağlı değil':('bağlı, pil %'+batt);
-  $('sRec').textContent=(fl&0x10)?'KAYITTA':'kapalı';
+  recOn=!!(fl&0x10); $('sRec').textContent=recOn?'KAYITTA':'kapalı';
   $('sKonum').textContent=['bekliyor','takipte','belirsiz','kayıp','bitti'][v.getUint8(3)]+' / adım '+v.getUint8(2);
 }
 
@@ -89,8 +114,8 @@ function nPut(f,o){const a=nGet();const k=nKey(f);a[k]=Object.assign(a[k]||{},o)
 function updLastNote(v){const m=metas();if(m.length){m[m.length-1].not=v;localStorage.setItem('meta',JSON.stringify(m))}}
 const wr=b=>crec.writeValue(new Uint8Array(b));
 
-async function startRec(){if(!$('selRek').value){alert('Önce rekat sayısını seç');return}saveMeta(Math.floor(Date.now()/1000),$('selKat').value,$('selRek').value,$('txtNot').value);await setTime();await cset.writeValue(new Uint8Array([0x41,1,1]));log('kayıt başlatma gönderildi')}
-async function stopRec(){await cset.writeValue(new Uint8Array([0x41,1,0]));log('kayıt bitirme gönderildi')}
+async function startRec(){if(!$('selRek').value){alert('Önce rekat sayısını seç');return}saveMeta(Math.floor(Date.now()/1000),$('selKat').value,$('selRek').value,$('txtNot').value);await setTime();await cset.writeValue(new Uint8Array([0x41,1,1]));log('kayıt başlatma gönderildi');setTimeout(()=>{const t=$('txtNot').value;if(t)enqueue(()=>sendNote(0xFE,t))},1500)}
+async function stopRec(){const t=$('txtNot').value;if(t)await enqueue(()=>sendNote(0xFE,t));await cset.writeValue(new Uint8Array([0x41,1,0]));log('kayıt bitirme gönderildi')}
 
 function onRec(ev){
   const v=ev.target.value, t=v.getUint8(0);
@@ -98,7 +123,7 @@ function onRec(ev){
     const idx=v.getUint8(1);
     if(idx===0xFF){listEntries=[];renderFiles();return}
     const total=v.getUint8(2); listEntries[idx]={idx,size:v.getUint32(3,true),epoch:v.getUint32(7,true)};
-    if(idx===total-1) renderFiles();
+    if(idx===total-1){renderFiles();enqueue(loadNotes)}
   }else if(t===0x82&&tx){
     const seq=v.getUint16(1,true);
     tx.last=Date.now();
@@ -109,7 +134,14 @@ function onRec(ev){
   }else if(t===0x83&&tx){
     const total=v.getUint32(2,true);
     if(tx.got===total&&!tx.waitResume)finishDownload(total); else resume('eksik');
-  }else if(t===0x84){log('yanıt: komut '+v.getUint8(1)+' durum '+v.getUint8(2))}
+  }else if(t===0x85){
+    const n=v.getUint8(3), txt=dec.decode(new Uint8Array(v.buffer.slice(v.byteOffset+4,v.byteOffset+4+n)));
+    if(waiter&&waiter.kind==='n85'){const w=waiter;waiter=null;w.res({idx:v.getUint8(1),flags:v.getUint8(2),text:txt})}
+  }else if(t===0x84){
+    const c=v.getUint8(1), st=v.getUint8(2);
+    if(waiter&&waiter.kind==='a'+c){const w=waiter;waiter=null;w.res(st)}
+    else if(waiter&&waiter.kind==='n85'&&c===6){const w=waiter;waiter=null;w.res(null)}
+    else log('yanıt: komut '+c+' durum '+st)}
 }
 
 async function list(){listEntries=[];await wr([1]);log('liste istendi')}
@@ -127,13 +159,15 @@ function renderFiles(){
     const tn=document.createElement('textarea'); tn.rows=2; tn.placeholder='Not'; tn.value=(m.not||''); tn.style.flex='1 1 100%';
 const st=document.createElement('small'); st.style.flex='1 1 100%'; st.style.color='#8c8'; st.textContent=(sv.not!==undefined||sv.kat||sv.rek!==undefined)?'✓ kayıtlı':'';
     const ok=()=>{st.textContent='✓ kaydedildi '+new Date().toLocaleTimeString()};
-    tn.oninput=()=>{nPut(f,{not:tn.value,kat:sk.value,rek:sr.value});ok()};
+    tn.oninput=()=>{nPut(f,{not:tn.value,kat:sk.value,rek:sr.value});st.style.color='#cc8';st.textContent='yazılıyor…';clearTimeout(f.tmr);
+      f.tmr=setTimeout(()=>enqueue(async()=>{const okk=await sendNote(f.idx,tn.value);st.style.color=okk?'#8c8':'#f96';st.textContent=okk?("✓ Kule'ye kaydedildi "+new Date().toLocaleTimeString()):"⚠ Kule'ye yazılamadı (yalnız bu cihazda saklandı)"}),700)};
     sk.onchange=()=>{nPut(f,{kat:sk.value,not:tn.value,rek:sr.value});ok()};
     sr.onchange=()=>{nPut(f,{rek:sr.value,kat:sk.value,not:tn.value});ok()};
     f.selK=sk;f.selR=sr;f.selN=tn; el.append(sk,sr,tn,st);
     const b=document.createElement('button'); b.textContent='İndir'; b.onclick=()=>download(f);
-    const x=document.createElement('button'); x.textContent='Sil'; x.className='gray'; x.onclick=async()=>{await wr([3,f.idx]);setTimeout(list,400)};
-    el.append(b,x); d.append(el);
+    const x=document.createElement('button'); x.textContent='Sil'; x.className='gray'; x.onclick=async()=>{if(!(f.flags&1)&&!confirm('Bu kayıt henüz indirilmedi. Yine de silinsin mi?'))return;await wr([3,f.idx]);setTimeout(list,400)};
+    const rb=document.createElement('span'); rb.style.color='#8c8'; rb.style.alignSelf='center'; f.rb=rb; f.bx=x; showFlag(f);
+    el.append(b,x,rb); d.append(el);
   });
 }
 async function download(f){if(f.selR&&!f.selR.value){alert('Bu kayıt için rekat sayısını seç');return}
@@ -154,10 +188,10 @@ function finishDownload(total){
   if(tx.got!==total){log('HATA: boyut uyuşmuyor ('+tx.got+'/'+total+')');tx=null;return}
   const kat=f.selK?f.selK.value:'standart', rek=f.selR?f.selR.value:'0';
   const name='namaz_'+kat+'_'+rek+'rk_'+(f.epoch?new Date(f.epoch*1000).toISOString().replace(/[:.]/g,'-').slice(0,19):('k'+(f.idx+1)));
-  save(new Blob([all]),name+'.bin');
   const not=f.selN?f.selN.value.split(String.fromCharCode(10)).join(' / ').split('#').join(''):'';
   save(new Blob([toCsv(all,kat,rek,not)],{type:'text/csv'}),name+'.csv');
-  log('indirildi: '+name+' (.bin + .csv)'); tx=null;
+  log('indirildi: '+name+'.csv'); tx=null;
+  enqueue(async()=>{if(await setFlag(f.idx,1)){f.flags=(f.flags||0)|1;showFlag(f)}});
 }
 function toCsv(b,kat,rek,not){
   const dv=new DataView(b.buffer), v3=(b[2]===51), v2=(b[2]===50||v3), RS=v3?13:v2?11:10, n=Math.floor((b.length-16)/RS), epoch=dv.getUint32(4,true);
@@ -171,7 +205,7 @@ async function save(blob,name){
   const file=new File([blob],name);
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click();
 }
-$('txtNot').oninput=()=>updLastNote($('txtNot').value);
+$('txtNot').oninput=()=>{updLastNote($('txtNot').value);clearTimeout(noteTmr);noteTmr=setTimeout(()=>{if(recOn)enqueue(()=>sendNote(0xFE,$('txtNot').value))},800)};
 $('bConn').onclick=connect; $('bStart').onclick=startRec; $('bStop').onclick=stopRec; $('bList').onclick=list;
 $('bDelAll').onclick=async()=>{if(confirm('Tüm kayıtlar silinsin mi?')){await wr([4]);setTimeout(list,400)}};
 </script>
