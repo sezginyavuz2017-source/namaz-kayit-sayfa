@@ -70,6 +70,10 @@ async function loadNotes(){
     const r=await getNote(f.idx);
     if(!r){ if(first){log('Kule not/işaret desteklemiyor veya yanıt yok (eski yazılım?)');return} continue}
     first=false; f.flags=r.flags;
+    const dc=decFlags(r.flags);
+    if(f.selK&&dc.kat&&document.activeElement!==f.selK)f.selK.value=dc.kat;
+    if(f.selR&&dc.rek!==''&&document.activeElement!==f.selR)f.selR.value=dc.rek;
+    if(dc.rek===''&&f.selR&&f.selR.value!==''){f.flags=encFlags(r.flags,f.selK.value,f.selR.value);const nf=f.flags;enqueue(()=>setFlag(f.idx,nf))}   // yerel/meta değerini Kule'ye taşı
     const sv=nGet()[nKey(f)]||{};
     if(f.selN){ if(r.text){ if(document.activeElement!==f.selN)f.selN.value=r.text }
                 else if(sv.not){ f.selN.value=sv.not; const t=sv.not; enqueue(()=>sendNote(f.idx,t)) } }
@@ -105,16 +109,20 @@ async function setTime(){
   await cset.writeValue(b);
 }
 const KAT={standart:'Standart',bayan:'Bayan',engelli:'Engelli',oturarak:'Oturarak namaz',aci_zorlanan:'Açılarda zorlanan'};
+// Kule'deki bayrak baytı: bit0 indirildi · bit1-3 rekat kodu (0 seçilmedi, 1 belirsiz, 2→2rk, 3→3rk, 4→4rk) · bit4-6 kategori (0 seçilmedi, 1..5)
+const KATS=Object.keys(KAT), REKS=['','0','2','3','4'];
+function encFlags(fl,kat,rek){const r=Math.max(0,REKS.indexOf(rek)), k=KATS.indexOf(kat)+1; return (fl&1)|(r<<1)|(k<<4)}
+function decFlags(fl){const r=REKS[(fl>>1)&7], k=KATS[((fl>>4)&7)-1]; return {rek:r===undefined?'':r, kat:k||''}}
 function metas(){try{return JSON.parse(localStorage.getItem('meta')||'[]')}catch(e){return[]}}
 function saveMeta(epoch,kat,rek,not){const m=metas();m.push({epoch,kat,rek,not:not||''});localStorage.setItem('meta',JSON.stringify(m.slice(-60)))}
 function findMeta(epoch){let best=null,bd=1e9;metas().forEach(x=>{const d=Math.abs(x.epoch-epoch);if(d<bd){bd=d;best=x}});return bd<=180?best:null}
 function nKey(f){return f.epoch?('e'+f.epoch):('i'+f.idx+'_'+f.size)}
 function nGet(){try{return JSON.parse(localStorage.getItem('notlar')||'{}')}catch(e){return{}}}
-function nPut(f,o){const a=nGet();const k=nKey(f);a[k]=Object.assign(a[k]||{},o);localStorage.setItem('notlar',JSON.stringify(a))}
+function nPut(f,o){if(o.rek==='')delete o.rek;if(o.kat==='')delete o.kat;const a=nGet();const k=nKey(f);a[k]=Object.assign(a[k]||{},o);localStorage.setItem('notlar',JSON.stringify(a))}
 function updLastNote(v){const m=metas();if(m.length){m[m.length-1].not=v;localStorage.setItem('meta',JSON.stringify(m))}}
 const wr=b=>crec.writeValue(new Uint8Array(b));
 
-async function startRec(){if(!$('selRek').value){alert('Önce rekat sayısını seç');return}saveMeta(Math.floor(Date.now()/1000),$('selKat').value,$('selRek').value,$('txtNot').value);await setTime();await cset.writeValue(new Uint8Array([0x41,1,1]));log('kayıt başlatma gönderildi');setTimeout(()=>{const t=$('txtNot').value;if(t)enqueue(()=>sendNote(0xFE,t))},1500)}
+async function startRec(){if(!$('selRek').value){alert('Önce rekat sayısını seç');return}saveMeta(Math.floor(Date.now()/1000),$('selKat').value,$('selRek').value,$('txtNot').value);await setTime();await cset.writeValue(new Uint8Array([0x41,1,1]));log('kayıt başlatma gönderildi');setTimeout(()=>{const t=$('txtNot').value;enqueue(async()=>{await setFlag(0xFE,encFlags(0,$('selKat').value,$('selRek').value));if(t)await sendNote(0xFE,t)})},1500)}
 async function stopRec(){const t=$('txtNot').value;if(t)await enqueue(()=>sendNote(0xFE,t));await cset.writeValue(new Uint8Array([0x41,1,0]));log('kayıt bitirme gönderildi')}
 
 function onRec(ev){
@@ -153,7 +161,7 @@ function renderFiles(){
     const when=f.epoch?new Date(f.epoch*1000).toLocaleString():'(saat yok)';
     el.innerHTML='<span>#'+(f.idx+1)+' '+when+'<br><small>'+Math.round(f.size/100)/10+' KB, ~'+Math.round((f.size-16)/10/10/60*10)/10+' dk</small></span>';
     const sv=nGet()[nKey(f)]||{}, m0=findMeta(f.epoch)||{};
-    const m={kat:sv.kat||m0.kat||$('selKat').value, rek:(sv.rek!==undefined?sv.rek:(m0.rek!==undefined?m0.rek:$('selRek').value)), not:(sv.not!==undefined?sv.not:(m0.not||''))};
+    const m={kat:sv.kat||m0.kat||$('selKat').value, rek:(sv.rek?sv.rek:(m0.rek!==undefined?m0.rek:$('selRek').value)), not:(sv.not!==undefined?sv.not:(m0.not||''))};
     const sk=document.createElement('select'); Object.keys(KAT).forEach(k=>{const o=document.createElement('option');o.value=k;o.textContent=KAT[k];if(k===m.kat)o.selected=true;sk.append(o)});
     const sr=document.createElement('select'); ['','2','3','4','0'].forEach(k=>{const o=document.createElement('option');o.value=k;o.textContent=k===''?'rekat seç…':k==='0'?'belirsiz':k+' rekat';if(k===String(m.rek))o.selected=true;sr.append(o)});
     const tn=document.createElement('textarea'); tn.rows=2; tn.placeholder='Not'; tn.value=(m.not||''); tn.style.flex='1 1 100%';
@@ -161,8 +169,8 @@ const st=document.createElement('small'); st.style.flex='1 1 100%'; st.style.col
     const ok=()=>{st.textContent='✓ kaydedildi '+new Date().toLocaleTimeString()};
     tn.oninput=()=>{nPut(f,{not:tn.value,kat:sk.value,rek:sr.value});st.style.color='#cc8';st.textContent='yazılıyor…';clearTimeout(f.tmr);
       f.tmr=setTimeout(()=>enqueue(async()=>{const okk=await sendNote(f.idx,tn.value);st.style.color=okk?'#8c8':'#f96';st.textContent=okk?("✓ Kule'ye kaydedildi "+new Date().toLocaleTimeString()):"⚠ Kule'ye yazılamadı (yalnız bu cihazda saklandı)"}),700)};
-    sk.onchange=()=>{nPut(f,{kat:sk.value,not:tn.value,rek:sr.value});ok()};
-    sr.onchange=()=>{nPut(f,{rek:sr.value,kat:sk.value,not:tn.value});ok()};
+    sk.onchange=()=>{nPut(f,{kat:sk.value,not:tn.value,rek:sr.value});f.flags=encFlags(f.flags||0,sk.value,sr.value);enqueue(()=>setFlag(f.idx,f.flags));ok()};
+    sr.onchange=()=>{nPut(f,{rek:sr.value,kat:sk.value,not:tn.value});f.flags=encFlags(f.flags||0,sk.value,sr.value);enqueue(()=>setFlag(f.idx,f.flags));ok()};
     f.selK=sk;f.selR=sr;f.selN=tn; el.append(sk,sr,tn,st);
     const b=document.createElement('button'); b.textContent='İndir'; b.onclick=()=>download(f);
     const x=document.createElement('button'); x.textContent='Sil'; x.className='gray'; x.onclick=async()=>{if(!(f.flags&1)&&!confirm('Bu kayıt henüz indirilmedi. Yine de silinsin mi?'))return;await wr([3,f.idx]);setTimeout(list,400)};
@@ -191,7 +199,7 @@ function finishDownload(total){
   const not=f.selN?f.selN.value.split(String.fromCharCode(10)).join(' / ').split('#').join(''):'';
   save(new Blob([toCsv(all,kat,rek,not)],{type:'text/csv'}),name+'.csv');
   log('indirildi: '+name+'.csv'); tx=null;
-  enqueue(async()=>{if(await setFlag(f.idx,1)){f.flags=(f.flags||0)|1;showFlag(f)}});
+  enqueue(async()=>{const nf=encFlags(f.flags||0,kat,rek)|1;if(await setFlag(f.idx,nf)){f.flags=nf;showFlag(f)}});
 }
 function toCsv(b,kat,rek,not){
   const dv=new DataView(b.buffer), v3=(b[2]===51), v2=(b[2]===50||v3), RS=v3?13:v2?11:10, n=Math.floor((b.length-16)/RS), epoch=dv.getUint32(4,true);
