@@ -34,6 +34,7 @@
   <div class="row"><span>Rekat</span>
     <select id="selRek"><option value="">seç…</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="0">belirsiz</option></select></div>
   <textarea id="txtNot" rows="3" placeholder="Not: özel durumlar, önemli hareketler (kayıt sırasında ya da sonrasında yazabilirsin)"></textarea>
+  <small id="stNot" style="display:block;min-height:1.2em"></small>
   <button id="bStart" class="" disabled>Kaydı başlat</button>
   <button id="bStop" class="red" disabled>Kaydı bitir</button>
 </div>
@@ -63,6 +64,12 @@ async function sendNote(idx,text){
   return true}
 async function setFlag(idx,fl){const p=waitFor('a7',2500); await wr([7,idx,fl]); return (await p)===0}
 async function getNote(idx){const p=waitFor('n85',2000); await wr([6,idx]); return p}
+async function sendGlobalNote(){
+  const t=$('txtNot').value, ok=await sendNote(0xFE,t), st=$('stNot');
+  st.style.color=ok?'#8c8':'#f96';
+  st.textContent=ok?("✓ Kule'ye kaydedildi "+new Date().toLocaleTimeString()):"⚠ Kule'ye yazılamadı (kayıt var mı? bağlantı açık mı?)";
+  log("not "+(ok?"Kule ye yazildi":"YAZILAMADI")+" ("+clip(t,120).length+" bayt)");
+  return ok}
 function showFlag(f){if(f.rb)f.rb.textContent=(f.flags&1)?'✓ indirildi':'';if(f.bx)f.bx.className=(f.flags&1)?'red':'gray'}
 async function loadNotes(){
   let first=true;
@@ -122,8 +129,8 @@ function nPut(f,o){if(o.rek==='')delete o.rek;if(o.kat==='')delete o.kat;const a
 function updLastNote(v){const m=metas();if(m.length){m[m.length-1].not=v;localStorage.setItem('meta',JSON.stringify(m))}}
 const wr=b=>crec.writeValue(new Uint8Array(b));
 
-async function startRec(){if(!$('selRek').value){alert('Önce rekat sayısını seç');return}saveMeta(Math.floor(Date.now()/1000),$('selKat').value,$('selRek').value,$('txtNot').value);await setTime();await cset.writeValue(new Uint8Array([0x41,1,1]));log('kayıt başlatma gönderildi');setTimeout(()=>{const t=$('txtNot').value;enqueue(async()=>{await setFlag(0xFE,encFlags(0,$('selKat').value,$('selRek').value));if(t)await sendNote(0xFE,t)})},1500)}
-async function stopRec(){const t=$('txtNot').value;if(t)await enqueue(()=>sendNote(0xFE,t));await cset.writeValue(new Uint8Array([0x41,1,0]));log('kayıt bitirme gönderildi');$('txtNot').value='';$('selRek').value=''}
+async function startRec(){if(!$('selRek').value){alert('Önce rekat sayısını seç');return}saveMeta(Math.floor(Date.now()/1000),$('selKat').value,$('selRek').value,$('txtNot').value);await setTime();await cset.writeValue(new Uint8Array([0x41,1,1]));log('kayıt başlatma gönderildi');setTimeout(()=>{const t=$('txtNot').value;enqueue(async()=>{await setFlag(0xFE,encFlags(0,$('selKat').value,$('selRek').value));if(t)await sendGlobalNote()})},1500)}
+async function stopRec(){const t=$('txtNot').value;if(t)await enqueue(()=>sendGlobalNote());await cset.writeValue(new Uint8Array([0x41,1,0]));log('kayıt bitirme gönderildi');$('txtNot').value='';$('selRek').value='';$('stNot').textContent=''}
 
 function onRec(ev){
   const v=ev.target.value, t=v.getUint8(0);
@@ -213,7 +220,7 @@ async function save(blob,name){
   const file=new File([blob],name);
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click();
 }
-$('txtNot').oninput=()=>{updLastNote($('txtNot').value);clearTimeout(noteTmr);noteTmr=setTimeout(()=>{if(recOn)enqueue(()=>sendNote(0xFE,$('txtNot').value))},800)};
+$('txtNot').oninput=()=>{updLastNote($('txtNot').value);clearTimeout(noteTmr);$('stNot').style.color='#cc8';$('stNot').textContent=recOn?'yazılıyor…':"(kayıt başlayınca Kule'ye gönderilir)";noteTmr=setTimeout(()=>{if(recOn)enqueue(()=>sendGlobalNote())},800)};
 $('bConn').onclick=connect; $('bStart').onclick=startRec; $('bStop').onclick=stopRec; $('bList').onclick=list;
 $('bDelAll').onclick=async()=>{if(confirm('Tüm kayıtlar silinsin mi?')){await wr([4]);setTimeout(list,400)}};
 </script>
