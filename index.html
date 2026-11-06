@@ -28,6 +28,7 @@
   <div class="row"><span>Yaka</span><b id="sYaka">-</b></div>
   <div class="row"><span>Kayıt</span><b id="sRec">-</b></div>
   <div class="row"><span>Konum</span><b id="sKonum">-</b></div>
+  <div class="row"><span>Komut</span><b id="sKomut">-</b></div>
 </div>
 <div class="box">
   <div class="row"><span>Kategori</span>
@@ -57,6 +58,12 @@
   <button id="bList" class="gray" disabled>Kayıtları listele</button>
   <button id="bDelAll" class="gray" disabled>Tümünü sil</button>
   <div id="files"></div>
+</div>
+<div class="box">
+  <div class="row"><span>Sesli komut (hoca)</span>
+    <select id="selSes"><option value="1">Açık</option><option value="0">Kapalı</option></select></div>
+  <small>Kule hoca komutunu bildirince telefon çalar (hoparlör/kulaklık). Dosya yüklemezsen telefonun Türkçe sesi komutu okur. Bağlanınca ekran açık kalır.</small>
+  <div id="sesDosya"></div>
 </div>
 <div id="log"></div>
 <script>
@@ -120,6 +127,7 @@ async function connect(){
 
 function onStatus(ev){
   const v=ev.target.value; // 20 bayt
+  komutOlay(v);
   const fl=v.getUint8(5), err=v.getUint8(8), batt=v.getUint8(13);
   $('sYaka').textContent= err==6?'eşleşme bekliyor': err==1||batt==255?'bağlı değil':('bağlı, pil %'+batt);
   recOn=!!(fl&0x10); $('sRec').textContent=recOn?'KAYITTA':'kapalı';
@@ -185,6 +193,49 @@ function radChanged(){
   if(recOn){updLastNote(composeNote($('txtNot').value));clearTimeout(radTmr);radTmr=setTimeout(()=>enqueue(()=>sendGlobalNote()),800)}   // yalnız kayıt sürerken; geçmiş kaydın notunu ezmez
 }
 function radSync(){const lx=['0','20','-20','50','-50'].indexOf(String(rad.x))>=0?String(rad.x):'o', ly=['70','100','150'].indexOf(String(rad.y))>=0?String(rad.y):'o'; $('selLat').value=lx; $('selDst').value=ly}
+// ---- Sesli hoca komutu (K46): Kule komutu Char 1'de bildirir (olay_kodu 0x10, arg = adım indeksi); telefon sesi çalar ----
+// Komut metinleri ve sırası rules/hanefi.json'dan üretilen hoca_sabah.json'dadır (dogrulandi=false); sayfa fıkıh içeriği tutmaz.
+let hoca=null, actx=null, sesBuf={}, komutIlk=true, sonKod=-1, sonArg=-1, wl=null;
+try{fetch('hoca_sabah.json').then(r=>r.json()).then(j=>{hoca=j;sesArayuz()}).catch(()=>{})}catch(e){}
+function idb(){return new Promise((res,rej)=>{const q=indexedDB.open('namazses',1);q.onupgradeneeded=()=>q.result.createObjectStore('ses');q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)})}
+async function idbPut(k,v){const d=await idb();return new Promise((res,rej)=>{const t=d.transaction('ses','readwrite');t.objectStore('ses').put(v,k);t.oncomplete=res;t.onerror=()=>rej(t.error)})}
+async function idbGet(k){const d=await idb();return new Promise((res,rej)=>{const q=d.transaction('ses').objectStore('ses').get(k);q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)})}
+function sesCtx(){if(!actx)actx=new (window.AudioContext||window.webkitAudioContext)();return actx}
+async function sesCoz(cue,blob){const ab=await blob.arrayBuffer();sesBuf[cue]=await sesCtx().decodeAudioData(ab)}
+function sesAc(){   // kullanıcı dokunuşunda çağrılır: ses bağlamı + ekran açık kalsın + telefon sesi açılsın
+  try{sesCtx().resume()}catch(e){}
+  try{if(navigator.wakeLock)navigator.wakeLock.request('screen').then(x=>{wl=x}).catch(()=>{})}catch(e){}
+  try{speechSynthesis.speak(new SpeechSynthesisUtterance(''))}catch(e){}
+}
+function komutCal(cue){
+  try{if(sesBuf[cue]){const s=sesCtx().createBufferSource();s.buffer=sesBuf[cue];s.connect(sesCtx().destination);s.start();return 'dosya'}}catch(e){}
+  try{const u=new SpeechSynthesisUtterance(cue);u.lang='tr-TR';speechSynthesis.cancel();speechSynthesis.speak(u);return 'telefon sesi'}catch(e){}
+  return 'ses yok';
+}
+function komutOlay(v){
+  const kod=v.getUint8(17), arg=v.getUint8(18);
+  if(kod===0x10&&hoca&&hoca.adimlar[arg])$('sKomut').textContent=hoca.adimlar[arg].cue+' — '+hoca.adimlar[arg].ipucu;
+  else if(kod===0x11)$('sKomut').textContent='rehber bitti';
+  if(komutIlk){komutIlk=false;sonKod=kod;sonArg=arg;return}      // bağlanınca yarıda kalmış komutun sesi çalınmaz
+  const yeni=(kod!==sonKod||arg!==sonArg); sonKod=kod; sonArg=arg;
+  if(!yeni)return;
+  if(kod===0x10&&hoca&&hoca.adimlar[arg]&&$('selSes').value==='1'){const a=hoca.adimlar[arg];const k=komutCal(a.cue);log('komut '+(arg+1)+'/'+hoca.adimlar.length+': '+a.cue+' ('+k+')')}
+  else if(kod===0x11)log('rehber bitti');
+}
+function sesArayuz(){
+  const box=$('sesDosya'); box.innerHTML='';
+  [...new Set(hoca.adimlar.map(a=>a.cue))].forEach(cue=>{
+    const row=document.createElement('div'); row.className='file';
+    const lb=document.createElement('span'); lb.textContent=cue;
+    const inp=document.createElement('input'); inp.type='file'; inp.accept='audio/*'; inp.style.flex='1 1 60%';
+    const dn=document.createElement('button'); dn.className='gray'; dn.textContent='Dene';
+    const st=document.createElement('small'); st.style.flex='1 1 100%'; st.textContent='telefon sesi';
+    dn.onclick=()=>{sesAc();log('deneme: '+cue+' ('+komutCal(cue)+')')};
+    inp.onchange=async()=>{const f=inp.files[0];if(!f)return;try{await idbPut(cue,f);await sesCoz(cue,f);st.textContent='dosya: '+f.name}catch(e){st.textContent='hata: '+e}};
+    row.append(lb,inp,dn,st); box.append(row);
+    if(typeof indexedDB!=='undefined')idbGet(cue).then(b=>{if(b)sesCoz(cue,b).then(()=>{st.textContent='dosya (kayıtlı)'}).catch(()=>{})}).catch(()=>{});
+  });
+}
 const wr=b=>crec.writeValue(new Uint8Array(b));
 
 async function startRec(){if(!$('selRek').value){alert('Önce rekat sayısını seç');return}if(rad.m===''){alert('Önce radar durumunu seç');return}saveMeta(Math.floor(Date.now()/1000),$('selKat').value,$('selRek').value,composeNote($('txtNot').value));await setTime();await cset.writeValue(new Uint8Array([0x41,1,1]));log('kayıt başlatma gönderildi');setTimeout(()=>{const t=$('txtNot').value;enqueue(async()=>{await setFlag(0xFE,encFlags(0,$('selKat').value,$('selRek').value));if(t||radTag())await sendGlobalNote()})},1500)}
@@ -291,7 +342,7 @@ $('cvRad').onpointerdown=ev=>{ev.preventDefault();const r=ev.target.getBoundingC
 $('selDon').onchange=()=>{rad.am=$('selDon').value;if(rad.am==='e'){rad.a=radAngAuto();$('rngDon').value=rad.a}radChanged()};
 $('rngDon').oninput=()=>{rad.a=+$('rngDon').value;$('lbDon').textContent=rad.a+'°';radChanged()};
 $('selRad').value=rad.m; $('selDon').value=rad.am; $('rngDon').value=rad.a; $('lbDon').textContent=rad.a+'°'; radSync(); radChanged();
-$('bConn').onclick=connect; $('bStart').onclick=startRec; $('bStop').onclick=stopRec; $('bList').onclick=list;
+$('bConn').onclick=()=>{sesAc();komutIlk=true;connect()}; $('bStart').onclick=startRec; $('bStop').onclick=stopRec; $('bList').onclick=list;
 $('bDelAll').onclick=async()=>{if(confirm('Tüm kayıtlar silinsin mi?')){await wr([4]);setTimeout(list,400)}};
 </script>
 </body>

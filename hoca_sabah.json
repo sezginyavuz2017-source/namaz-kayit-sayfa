@@ -1,0 +1,106 @@
+{
+ "kural": "sabah_farzi_hoca_komutlari",
+ "kaynak": "TBD (Diyanet İlmihali, namaz bölümü; cilt/sayfa)",
+ "dogrulandi": false,
+ "rekat": 2,
+ "adimlar": [
+  {
+   "cue": "Allahu Ekber",
+   "adim": "kiyam",
+   "rekat": 1,
+   "sure_sn": 40,
+   "ipucu": "ayakta dur, kiraati dinle"
+  },
+  {
+   "cue": "Allahu Ekber",
+   "adim": "ruku",
+   "rekat": 1,
+   "sure_sn": 4,
+   "ipucu": "rukuda bekle"
+  },
+  {
+   "cue": "Semiallahu limen hamideh",
+   "adim": "itidal",
+   "rekat": 1,
+   "sure_sn": 2,
+   "ipucu": "dogrul, ayakta dur"
+  },
+  {
+   "cue": "Allahu Ekber",
+   "adim": "secde",
+   "rekat": 1,
+   "sure_sn": 4,
+   "ipucu": "secdede bekle"
+  },
+  {
+   "cue": "Allahu Ekber",
+   "adim": "celse",
+   "rekat": 1,
+   "sure_sn": 2,
+   "ipucu": "iki secde arasi otur"
+  },
+  {
+   "cue": "Allahu Ekber",
+   "adim": "secde",
+   "rekat": 1,
+   "sure_sn": 4,
+   "ipucu": "ikinci secdede bekle"
+  },
+  {
+   "cue": "Allahu Ekber",
+   "adim": "kiyam",
+   "rekat": 2,
+   "sure_sn": 25,
+   "ipucu": "ikinci rekat, ayakta dur"
+  },
+  {
+   "cue": "Allahu Ekber",
+   "adim": "ruku",
+   "rekat": 2,
+   "sure_sn": 4,
+   "ipucu": "rukuda bekle"
+  },
+  {
+   "cue": "Semiallahu limen hamideh",
+   "adim": "itidal",
+   "rekat": 2,
+   "sure_sn": 2,
+   "ipucu": "dogrul, ayakta dur"
+  },
+  {
+   "cue": "Allahu Ekber",
+   "adim": "secde",
+   "rekat": 2,
+   "sure_sn": 4,
+   "ipucu": "secdede bekle"
+  },
+  {
+   "cue": "Allahu Ekber",
+   "adim": "celse",
+   "rekat": 2,
+   "sure_sn": 2,
+   "ipucu": "iki secde arasi otur"
+  },
+  {
+   "cue": "Allahu Ekber",
+   "adim": "secde",
+   "rekat": 2,
+   "sure_sn": 4,
+   "ipucu": "ikinci secdede bekle"
+  },
+  {
+   "cue": "Allahu Ekber",
+   "adim": "kade",
+   "rekat": 2,
+   "sure_sn": 30,
+   "ipucu": "son oturus, otur"
+  },
+  {
+   "cue": "Esselamu aleykum ve rahmetullah",
+   "adim": "selam",
+   "rekat": 2,
+   "sure_sn": 8,
+   "ipucu": "saga ve sola selam ver"
+  }
+ ]
+}
