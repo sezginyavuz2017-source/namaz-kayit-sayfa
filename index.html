@@ -208,11 +208,11 @@ function sesAc(){   // kullanıcı dokunuşunda çağrılır: ses bağlamı + ek
   try{speechSynthesis.speak(new SpeechSynthesisUtterance(''))}catch(e){}
 }
 function kirpGet(){try{return JSON.parse(localStorage.getItem('seskirp')||'{}')}catch(e){return{}}}
-function komutCal(cue){
+function komutCal(cue,metin){   // cue = ses kimliği (kalkis/kisa/...); metin = ses dosyası yoksa telefonun okuyacağı yazı
   try{if(sesBuf[cue]){const k=kirpGet()[cue]||{},b=+k.b||0,e=+k.s||0;   // uzun kayıttan (örn. mp4) yalnız [baş, son] saniye aralığı çalınır
     const s=sesCtx().createBufferSource();s.buffer=sesBuf[cue];s.connect(sesCtx().destination);
     if(e>b)s.start(0,b,e-b);else s.start(0,b);return 'dosya'}}catch(e){}
-  try{const u=new SpeechSynthesisUtterance(cue);u.lang='tr-TR';speechSynthesis.cancel();speechSynthesis.speak(u);return 'telefon sesi'}catch(e){}
+  try{const u=new SpeechSynthesisUtterance(metin||cue);u.lang='tr-TR';speechSynthesis.cancel();speechSynthesis.speak(u);return 'telefon sesi'}catch(e){}
   return 'ses yok';
 }
 function komutOlay(v){
@@ -222,14 +222,26 @@ function komutOlay(v){
   if(komutIlk){komutIlk=false;sonKod=kod;sonArg=arg;return}      // bağlanınca yarıda kalmış komutun sesi çalınmaz
   const yeni=(kod!==sonKod||arg!==sonArg); sonKod=kod; sonArg=arg;
   if(!yeni)return;
-  if(kod===0x10&&hoca&&hoca.adimlar[arg]&&$('selSes').value==='1'){const a=hoca.adimlar[arg];const k=komutCal(a.cue);log('komut '+(arg+1)+'/'+hoca.adimlar.length+': '+a.cue+' ('+k+')')}
+  if(kod===0x10&&hoca&&hoca.adimlar[arg]&&$('selSes').value==='1'){const a=hoca.adimlar[arg];const k=komutCal(a.ses||a.cue,a.cue);log('komut '+(arg+1)+'/'+hoca.adimlar.length+': '+a.cue+' ('+k+')')}
   else if(kod===0x11)log('rehber bitti');
+}
+async function sesToplu(files){   // birden çok dosyayı adlarına göre ses kimliklerine eşler (hoca_sabah.json: ses_dosya)
+  const m=(hoca&&hoca.ses_dosya)||{};let n=0,yok=[];
+  for(const f of files){const ad=f.name.toLowerCase().replace(/\.[^.]+$/,'');const id=Object.keys(m).find(k=>m[k]===ad);
+    if(!id){yok.push(f.name);continue}
+    try{await idbPut(id,f);await sesCoz(id,f);const s=$('sesDurum_'+id);if(s)s.textContent='dosya: '+f.name;n++}catch(e){yok.push(f.name+' ('+e+')')}}
+  log('toplu yükleme: '+n+' ses yüklendi'+(yok.length?'; eşleşmeyen: '+yok.join(', '):''));
 }
 function sesArayuz(){
   const box=$('sesDosya'); box.innerHTML='';
-  [...new Set(hoca.adimlar.map(a=>a.cue))].forEach(cue=>{
+  const tp=document.createElement('div');tp.className='file';
+  const tl=document.createElement('span');tl.textContent='Hepsini birden seç';
+  const ti=document.createElement('input');ti.type='file';ti.multiple=true;ti.accept='audio/*,.wav,.mp3,.m4a,.ogg';ti.style.flex='1 1 60%';
+  ti.onchange=()=>sesToplu([...ti.files]);tp.append(tl,ti);box.append(tp);
+  const metinler={};hoca.adimlar.forEach(a=>{const id=a.ses||a.cue;if(!metinler[id])metinler[id]=a.cue});
+  Object.keys(metinler).forEach(cue=>{
     const row=document.createElement('div'); row.className='file';
-    const lb=document.createElement('span'); lb.textContent=cue;
+    const lb=document.createElement('span'); lb.textContent=metinler[cue]+(cue!==metinler[cue]?' ('+cue+')':'');
     const inp=document.createElement('input'); inp.type='file'; inp.accept='audio/*,video/mp4,video/*,.mp4,.m4a,.mp3,.ogg,.wav'; inp.style.flex='1 1 60%';
     const kb=document.createElement('input'), ks=document.createElement('input');   // kırpma: başlangıç / bitiş (sn); boş = baştan sona
     [kb,ks].forEach((x,i)=>{x.type='number';x.min='0';x.step='0.1';x.placeholder=i?'son sn':'baş sn';x.style.cssText='width:30%;background:#333;color:#eee;border:0;border-radius:6px;padding:6px;font-size:15px';
@@ -237,9 +249,9 @@ function sesArayuz(){
       x.onchange=()=>{const a=kirpGet();a[cue]=Object.assign(a[cue]||{},{[i?'s':'b']:+x.value||0});localStorage.setItem('seskirp',JSON.stringify(a))}});
     const dn=document.createElement('button'); dn.className='gray'; dn.textContent='Dene';
     const st=document.createElement('small'); st.style.flex='1 1 100%'; st.textContent='telefon sesi';
-    dn.onclick=()=>{sesAc();log('deneme: '+cue+' ('+komutCal(cue)+')')};
+    dn.onclick=()=>{sesAc();log('deneme: '+cue+' ('+komutCal(cue,metinler[cue])+')')};
     inp.onchange=async()=>{const f=inp.files[0];if(!f)return;try{await idbPut(cue,f);await sesCoz(cue,f);st.textContent='dosya: '+f.name}catch(e){st.textContent='hata: '+e}};
-    row.append(lb,inp,kb,ks,dn,st); box.append(row);
+    st.id='sesDurum_'+cue; row.append(lb,inp,kb,ks,dn,st); box.append(row);
     if(typeof indexedDB!=='undefined')idbGet(cue).then(b=>{if(b)sesCoz(cue,b).then(()=>{st.textContent='dosya (kayıtlı)'}).catch(()=>{})}).catch(()=>{});
   });
 }

@@ -3,8 +3,16 @@
  "kaynak": "TBD (Diyanet İlmihali, namaz bölümü; cilt/sayfa)",
  "dogrulandi": false,
  "rekat": 2,
+ "ses_dosya": {
+  "kalkis": "allahuekber_kalkis",
+  "kisa": "allahuekber_kisa",
+  "oturus": "allahuekber_oturus",
+  "selam": "esselamunaleykum",
+  "itidal": "semiallahulimenhamideh"
+ },
  "adimlar": [
   {
+   "ses": "kalkis",
    "cue": "Allahu Ekber",
    "adim": "kiyam",
    "rekat": 1,
@@ -12,6 +20,7 @@
    "ipucu": "ayakta dur, kiraati dinle"
   },
   {
+   "ses": "kisa",
    "cue": "Allahu Ekber",
    "adim": "ruku",
    "rekat": 1,
@@ -19,6 +28,7 @@
    "ipucu": "rukuda bekle"
   },
   {
+   "ses": "itidal",
    "cue": "Semiallahu limen hamideh",
    "adim": "itidal",
    "rekat": 1,
@@ -26,6 +36,7 @@
    "ipucu": "dogrul, ayakta dur"
   },
   {
+   "ses": "kisa",
    "cue": "Allahu Ekber",
    "adim": "secde",
    "rekat": 1,
@@ -33,6 +44,7 @@
    "ipucu": "secdede bekle"
   },
   {
+   "ses": "oturus",
    "cue": "Allahu Ekber",
    "adim": "celse",
    "rekat": 1,
@@ -40,6 +52,7 @@
    "ipucu": "iki secde arasi otur"
   },
   {
+   "ses": "kisa",
    "cue": "Allahu Ekber",
    "adim": "secde",
    "rekat": 1,
@@ -47,6 +60,7 @@
    "ipucu": "ikinci secdede bekle"
   },
   {
+   "ses": "kalkis",
    "cue": "Allahu Ekber",
    "adim": "kiyam",
    "rekat": 2,
@@ -54,6 +68,7 @@
    "ipucu": "ikinci rekat, ayakta dur"
   },
   {
+   "ses": "kisa",
    "cue": "Allahu Ekber",
    "adim": "ruku",
    "rekat": 2,
@@ -61,6 +76,7 @@
    "ipucu": "rukuda bekle"
   },
   {
+   "ses": "itidal",
    "cue": "Semiallahu limen hamideh",
    "adim": "itidal",
    "rekat": 2,
@@ -68,6 +84,7 @@
    "ipucu": "dogrul, ayakta dur"
   },
   {
+   "ses": "kisa",
    "cue": "Allahu Ekber",
    "adim": "secde",
    "rekat": 2,
@@ -75,6 +92,7 @@
    "ipucu": "secdede bekle"
   },
   {
+   "ses": "oturus",
    "cue": "Allahu Ekber",
    "adim": "celse",
    "rekat": 2,
@@ -82,6 +100,7 @@
    "ipucu": "iki secde arasi otur"
   },
   {
+   "ses": "kisa",
    "cue": "Allahu Ekber",
    "adim": "secde",
    "rekat": 2,
@@ -89,6 +108,7 @@
    "ipucu": "ikinci secdede bekle"
   },
   {
+   "ses": "oturus",
    "cue": "Allahu Ekber",
    "adim": "kade",
    "rekat": 2,
@@ -96,6 +116,7 @@
    "ipucu": "son oturus, otur"
   },
   {
+   "ses": "selam",
    "cue": "Esselamu aleykum ve rahmetullah",
    "adim": "selam",
    "rekat": 2,
