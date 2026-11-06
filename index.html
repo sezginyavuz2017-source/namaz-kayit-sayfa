@@ -17,6 +17,7 @@
   .file>span{width:100%}
   .file select{flex:1 1 40%;min-width:0}
   .file button{flex:1 1 40%;margin:0}
+  canvas{display:block;background:#222;border-radius:8px;width:100%;max-width:340px;margin:8px auto 4px;touch-action:manipulation}
 </style>
 </head>
 <body>
@@ -33,6 +34,17 @@
     <select id="selKat"><option value="standart">Standart</option><option value="bayan">Bayan</option><option value="engelli">Engelli</option><option value="oturarak">Oturarak namaz</option><option value="aci_zorlanan">Açılarda zorlanan</option></select></div>
   <div class="row"><span>Rekat</span>
     <select id="selRek"><option value="">seç…</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="0">belirsiz</option></select></div>
+  <div class="row"><span>Radar</span>
+    <select id="selRad"><option value="">seç…</option><option value="0">Radar yok (radarsız kayıt)</option><option value="1">Radar var, konumlandı</option><option value="2">Radar var, devre dışı</option></select></div>
+  <div id="pnRad" style="display:none">
+    <div class="row"><span>Yanlamasına</span>
+      <select id="selLat"><option value="o">özel (haritadan)</option><option value="0">tam karşımda</option><option value="20">hafif sağda</option><option value="-20">hafif solda</option><option value="50">sağda</option><option value="-50">solda</option></select></div>
+    <div class="row"><span>Uzaklık</span>
+      <select id="selDst"><option value="o">özel (haritadan)</option><option value="70">yakın</option><option value="100">normal</option><option value="150">uzak</option></select></div>
+    <canvas id="cvRad" width="320" height="312"></canvas>
+    <small>Haritaya dokunarak Kule'nin yerini işaretle. Yukarısı Kâbe, "ben" = ayakta durduğum yer.</small>
+  </div>
+  <small id="lbRad" style="display:block;min-height:1.2em;color:#9cf;margin-bottom:6px"></small>
   <textarea id="txtNot" rows="3" placeholder="Not: özel durumlar, önemli hareketler (kayıt sırasında ya da sonrasında yazabilirsin)"></textarea>
   <small id="stNot" style="display:block;min-height:1.2em"></small>
   <button id="bStart" class="" disabled>Kaydı başlat</button>
@@ -65,10 +77,10 @@ async function sendNote(idx,text){
 async function setFlag(idx,fl){const p=waitFor('a7',2500); await wr([7,idx,fl]); return (await p)===0}
 async function getNote(idx){const p=waitFor('n85',2000); await wr([6,idx]); return p}
 async function sendGlobalNote(){
-  const t=$('txtNot').value, ok=await sendNote(0xFE,t), st=$('stNot');
+  const t=composeNote($('txtNot').value), ok=await sendNote(0xFE,t), st=$('stNot');
   st.style.color=ok?'#8c8':'#f96';
   st.textContent=ok?("✓ Kule'ye kaydedildi "+new Date().toLocaleTimeString()):"⚠ Kule'ye yazılamadı (kayıt var mı? bağlantı açık mı?)";
-  log("not "+(ok?"Kule ye yazildi":"YAZILAMADI")+" ("+clip(t,120).length+" bayt)");
+  log("not "+(ok?"Kule ye yazildi":"YAZILAMADI")+" ("+clip(t,120).length+" bayt)"+(enc.encode(t).length>120?" UYARI: not 120 bayta kisaldi (radar etiketi bu sinira dahil)":""));
   return ok}
 function showFlag(f){if(f.rb)f.rb.textContent=(f.flags&1)?'✓ indirildi':'';if(f.bx)f.bx.className=(f.flags&1)?'red':'gray'}
 async function loadNotes(){
@@ -127,10 +139,46 @@ function nKey(f){return f.epoch?('e'+f.epoch):('i'+f.idx+'_'+f.size)}
 function nGet(){try{return JSON.parse(localStorage.getItem('notlar')||'{}')}catch(e){return{}}}
 function nPut(f,o){if(o.rek==='')delete o.rek;if(o.kat==='')delete o.kat;const a=nGet();const k=nKey(f);a[k]=Object.assign(a[k]||{},o);localStorage.setItem('notlar',JSON.stringify(a))}
 function updLastNote(v){const m=metas();if(m.length){m[m.length-1].not=v;localStorage.setItem('meta',JSON.stringify(m))}}
+// Radar/Kule konumu işareti (not başına etiket olarak Kule'ye yazılır → telefon ve laptop ortak görür):
+//   [R=0] radarsız · [R=1 x=-30 y=100] radar konumlandı · [R=2 x=.. y=..] radar var ama devre dışı
+//   x: ben(ayakta durduğum yer)'e göre sağ(+)/sol(-) cm · y: ileri (Kâbe yönü) cm. Yalnız kayıt etiketi; karar/eşik değildir.
+let rad={m:'',x:0,y:100}, radTmr=null;
+try{Object.assign(rad,JSON.parse(localStorage.getItem('radar')||'{}'))}catch(e){}
+function radTag(){if(rad.m==='')return '';return rad.m==='0'?'[R=0]':'[R='+rad.m+' x='+rad.x+' y='+rad.y+']'}
+function composeNote(t){const g=radTag();return g?(g+(t?' '+t:'')):(t||'')}
+function radDesc(){
+  if(rad.m==='')return 'Radar durumunu seç';
+  if(rad.m==='0')return 'Radarsız kayıt';
+  const ax=Math.abs(rad.x), side=rad.x>0?'sağda':'solda';
+  const lat=ax<=10?'tam karşımda':(ax<=35?'hafif '+side:side);
+  const dst=rad.y<85?'yakın':(rad.y<=130?'normal uzaklık':'uzak');
+  return (rad.m==='1'?'Radar konumlandı':'Radar devre dışı')+': '+lat+', '+dst+' (yanlama '+rad.x+' cm, ileri '+rad.y+' cm)';
+}
+function drawRad(){
+  const c=$('cvRad'), g=c.getContext('2d'), SC=1.3, ox=160, oy=270;
+  g.fillStyle='#222'; g.fillRect(0,0,320,312);
+  g.strokeStyle='#4a7'; g.lineWidth=2; g.strokeRect(ox-35*SC,oy-95*SC,70*SC,110*SC);   // standart seccade 70x110 cm
+  g.font='12px sans-serif'; g.textAlign='center'; g.fillStyle='#888'; g.fillText('seccade',ox,oy-95*SC+14);
+  g.fillStyle='#fc3'; g.beginPath(); g.arc(ox,oy,7,0,6.3); g.fill(); g.fillText('ben',ox,oy+22);
+  g.fillStyle='#9cf'; g.fillText('Kâbe ↑',ox,12); g.strokeStyle='#9cf'; g.lineWidth=2; g.beginPath(); g.moveTo(ox,18); g.lineTo(ox,44); g.stroke();
+  if(rad.m==='1'||rad.m==='2'){
+    const px=ox+rad.x*SC, py=oy-rad.y*SC, col=rad.m==='1'?'#e55':'#777';
+    g.fillStyle=col; g.fillRect(px-13,py-5,26,10); g.fillStyle='#fff'; g.fillText('Kule',px,py-9);
+    g.strokeStyle=col; g.beginPath(); g.moveTo(px,py+6); g.lineTo(px,py+26); g.moveTo(px-4,py+20); g.lineTo(px,py+26); g.lineTo(px+4,py+20); g.stroke();   // radar kişiye bakar
+  }
+  $('lbRad').textContent=radDesc();
+}
+function radChanged(){
+  localStorage.setItem('radar',JSON.stringify(rad));
+  $('pnRad').style.display=(rad.m==='1'||rad.m==='2')?'block':'none';
+  drawRad();
+  if(recOn){updLastNote(composeNote($('txtNot').value));clearTimeout(radTmr);radTmr=setTimeout(()=>enqueue(()=>sendGlobalNote()),800)}   // yalnız kayıt sürerken; geçmiş kaydın notunu ezmez
+}
+function radSync(){const lx=['0','20','-20','50','-50'].indexOf(String(rad.x))>=0?String(rad.x):'o', ly=['70','100','150'].indexOf(String(rad.y))>=0?String(rad.y):'o'; $('selLat').value=lx; $('selDst').value=ly}
 const wr=b=>crec.writeValue(new Uint8Array(b));
 
-async function startRec(){if(!$('selRek').value){alert('Önce rekat sayısını seç');return}saveMeta(Math.floor(Date.now()/1000),$('selKat').value,$('selRek').value,$('txtNot').value);await setTime();await cset.writeValue(new Uint8Array([0x41,1,1]));log('kayıt başlatma gönderildi');setTimeout(()=>{const t=$('txtNot').value;enqueue(async()=>{await setFlag(0xFE,encFlags(0,$('selKat').value,$('selRek').value));if(t)await sendGlobalNote()})},1500)}
-async function stopRec(){const t=$('txtNot').value;if(t)await enqueue(()=>sendGlobalNote());await cset.writeValue(new Uint8Array([0x41,1,0]));log('kayıt bitirme gönderildi');$('txtNot').value='';$('selRek').value='';$('stNot').textContent=''}
+async function startRec(){if(!$('selRek').value){alert('Önce rekat sayısını seç');return}if(rad.m===''){alert('Önce radar durumunu seç');return}saveMeta(Math.floor(Date.now()/1000),$('selKat').value,$('selRek').value,composeNote($('txtNot').value));await setTime();await cset.writeValue(new Uint8Array([0x41,1,1]));log('kayıt başlatma gönderildi');setTimeout(()=>{const t=$('txtNot').value;enqueue(async()=>{await setFlag(0xFE,encFlags(0,$('selKat').value,$('selRek').value));if(t||radTag())await sendGlobalNote()})},1500)}
+async function stopRec(){const t=$('txtNot').value;if(t||radTag())await enqueue(()=>sendGlobalNote());await cset.writeValue(new Uint8Array([0x41,1,0]));log('kayıt bitirme gönderildi');$('txtNot').value='';$('selRek').value='';$('stNot').textContent=''}
 
 function onRec(ev){
   const v=ev.target.value, t=v.getUint8(0);
@@ -210,7 +258,9 @@ function finishDownload(total){
 }
 function toCsv(b,kat,rek,not){
   const dv=new DataView(b.buffer), v3=(b[2]===51), v2=(b[2]===50||v3), RS=v3?13:v2?11:10, n=Math.floor((b.length-16)/RS), epoch=dv.getUint32(4,true);
-  let s='# epoch_s='+epoch+'\n# kategori='+kat+'\n# rekat='+rek+'\n# not='+(not||'')+'\n# surum='+(v3?'NK3':v2?'NK2':'NK1')+'\nt_s,pitch,roll,sensor_valid,tap,otomod_izliyor,yaka_canli,moving,yol_adimi'+(v2?',hareket_x4':'')+(v3?',ivme_alt_x100,ivme_ust_x100':'')+'\n';
+  const rm=/^\s*\[R=(\d)(?: x=(-?\d+) y=(-?\d+))?\]\s*/.exec(not||''), nt=rm?(not||'').slice(rm[0].length):(not||'');
+  const radh=rm?('# radar_modu='+['yok','var_konumlu','var_devre_disi'][+rm[1]]+(rm[2]!==undefined?'\n# kule_yanlama_cm='+rm[2]+'\n# kule_ileri_cm='+rm[3]:'')):'# radar_modu=belirtilmedi';
+  let s='# epoch_s='+epoch+'\n# kategori='+kat+'\n# rekat='+rek+'\n'+radh+'\n# not='+nt+'\n# surum='+(v3?'NK3':v2?'NK2':'NK1')+'\nt_s,pitch,roll,sensor_valid,tap,otomod_izliyor,yaka_canli,moving,yol_adimi'+(v2?',hareket_x4':'')+(v3?',ivme_alt_x100,ivme_ust_x100':'')+'\n';
   for(let i=0;i<n;i++){const o=16+i*RS, t=dv.getUint32(o,true), p=dv.getInt16(o+4,true), r=dv.getInt16(o+6,true), fl=dv.getUint8(o+8), st=dv.getUint8(o+9);
     s+=(t/1000).toFixed(2)+','+(p/100).toFixed(2)+','+(r/100).toFixed(2)+','+(fl&1)+','+((fl>>1)&7)+','+((fl>>4)&1)+','+((fl>>5)&1)+','+((fl>>6)&1)+','+st+(v2?','+dv.getUint8(o+10):'')+(v3?','+dv.getUint8(o+11)+','+dv.getUint8(o+12):'')+'\n'}
   return s;
@@ -220,7 +270,14 @@ async function save(blob,name){
   const file=new File([blob],name);
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click();
 }
-$('txtNot').oninput=()=>{updLastNote($('txtNot').value);clearTimeout(noteTmr);$('stNot').style.color='#cc8';$('stNot').textContent=recOn?'yazılıyor…':"(kayıt başlayınca Kule'ye gönderilir)";noteTmr=setTimeout(()=>{if(recOn)enqueue(()=>sendGlobalNote())},800)};
+$('txtNot').oninput=()=>{updLastNote(composeNote($('txtNot').value));clearTimeout(noteTmr);$('stNot').style.color='#cc8';$('stNot').textContent=recOn?'yazılıyor…':"(kayıt başlayınca Kule'ye gönderilir)";noteTmr=setTimeout(()=>{if(recOn)enqueue(()=>sendGlobalNote())},800)};
+// Radar paneli: seçim ve harita (telefonda dokunmatik, tek dokunuş)
+$('selRad').onchange=()=>{rad.m=$('selRad').value;radChanged()};
+$('selLat').onchange=()=>{if($('selLat').value!=='o'){rad.x=+$('selLat').value;radChanged()}};
+$('selDst').onchange=()=>{if($('selDst').value!=='o'){rad.y=+$('selDst').value;radChanged()}};
+$('cvRad').onpointerdown=ev=>{ev.preventDefault();const r=ev.target.getBoundingClientRect(),k=320/r.width,px=(ev.clientX-r.left)*k,py=(ev.clientY-r.top)*k;
+  rad.x=Math.max(-120,Math.min(120,Math.round((px-160)/1.3)));rad.y=Math.max(-30,Math.min(210,Math.round((270-py)/1.3)));radSync();radChanged()};
+$('selRad').value=rad.m; radSync(); radChanged();
 $('bConn').onclick=connect; $('bStart').onclick=startRec; $('bStop').onclick=stopRec; $('bList').onclick=list;
 $('bDelAll').onclick=async()=>{if(confirm('Tüm kayıtlar silinsin mi?')){await wr([4]);setTimeout(list,400)}};
 </script>
