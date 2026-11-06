@@ -207,8 +207,11 @@ function sesAc(){   // kullanıcı dokunuşunda çağrılır: ses bağlamı + ek
   try{if(navigator.wakeLock)navigator.wakeLock.request('screen').then(x=>{wl=x}).catch(()=>{})}catch(e){}
   try{speechSynthesis.speak(new SpeechSynthesisUtterance(''))}catch(e){}
 }
+function kirpGet(){try{return JSON.parse(localStorage.getItem('seskirp')||'{}')}catch(e){return{}}}
 function komutCal(cue){
-  try{if(sesBuf[cue]){const s=sesCtx().createBufferSource();s.buffer=sesBuf[cue];s.connect(sesCtx().destination);s.start();return 'dosya'}}catch(e){}
+  try{if(sesBuf[cue]){const k=kirpGet()[cue]||{},b=+k.b||0,e=+k.s||0;   // uzun kayıttan (örn. mp4) yalnız [baş, son] saniye aralığı çalınır
+    const s=sesCtx().createBufferSource();s.buffer=sesBuf[cue];s.connect(sesCtx().destination);
+    if(e>b)s.start(0,b,e-b);else s.start(0,b);return 'dosya'}}catch(e){}
   try{const u=new SpeechSynthesisUtterance(cue);u.lang='tr-TR';speechSynthesis.cancel();speechSynthesis.speak(u);return 'telefon sesi'}catch(e){}
   return 'ses yok';
 }
@@ -227,12 +230,16 @@ function sesArayuz(){
   [...new Set(hoca.adimlar.map(a=>a.cue))].forEach(cue=>{
     const row=document.createElement('div'); row.className='file';
     const lb=document.createElement('span'); lb.textContent=cue;
-    const inp=document.createElement('input'); inp.type='file'; inp.accept='audio/*'; inp.style.flex='1 1 60%';
+    const inp=document.createElement('input'); inp.type='file'; inp.accept='audio/*,video/mp4,video/*,.mp4,.m4a,.mp3,.ogg,.wav'; inp.style.flex='1 1 60%';
+    const kb=document.createElement('input'), ks=document.createElement('input');   // kırpma: başlangıç / bitiş (sn); boş = baştan sona
+    [kb,ks].forEach((x,i)=>{x.type='number';x.min='0';x.step='0.1';x.placeholder=i?'son sn':'baş sn';x.style.cssText='width:30%;background:#333;color:#eee;border:0;border-radius:6px;padding:6px;font-size:15px';
+      x.value=(kirpGet()[cue]||{})[i?'s':'b']||'';
+      x.onchange=()=>{const a=kirpGet();a[cue]=Object.assign(a[cue]||{},{[i?'s':'b']:+x.value||0});localStorage.setItem('seskirp',JSON.stringify(a))}});
     const dn=document.createElement('button'); dn.className='gray'; dn.textContent='Dene';
     const st=document.createElement('small'); st.style.flex='1 1 100%'; st.textContent='telefon sesi';
     dn.onclick=()=>{sesAc();log('deneme: '+cue+' ('+komutCal(cue)+')')};
     inp.onchange=async()=>{const f=inp.files[0];if(!f)return;try{await idbPut(cue,f);await sesCoz(cue,f);st.textContent='dosya: '+f.name}catch(e){st.textContent='hata: '+e}};
-    row.append(lb,inp,dn,st); box.append(row);
+    row.append(lb,inp,kb,ks,dn,st); box.append(row);
     if(typeof indexedDB!=='undefined')idbGet(cue).then(b=>{if(b)sesCoz(cue,b).then(()=>{st.textContent='dosya (kayıtlı)'}).catch(()=>{})}).catch(()=>{});
   });
 }
