@@ -217,14 +217,22 @@ function komutCal(cue,metin){   // cue = ses kimliği (kalkis/kisa/...); metin =
 }
 function komutOlay(v){
   const kod=v.getUint8(17), arg=v.getUint8(18);
-  if(kod===0x10&&hoca&&hoca.adimlar[arg])$('sKomut').textContent=hoca.adimlar[arg].cue+' — '+hoca.adimlar[arg].ipucu;
+  const rk=(kod===0x10||kod===0x12);                       // 0x10 komut (geçiş bekleniyor) · 0x12 yerleşti (K48: sayım başladı)
+  const a=rk&&hoca&&hoca.adimlar[arg]?hoca.adimlar[arg]:null;
+  if(a)$('sKomut').textContent=a.cue+' — '+(kod===0x12?'yerleşti ✓':a.ipucu);
   else if(kod===0x11)$('sKomut').textContent='rehber bitti';
   if(komutIlk){komutIlk=false;sonKod=kod;sonArg=arg;return}      // bağlanınca yarıda kalmış komutun sesi çalınmaz
-  const yeni=(kod!==sonKod||arg!==sonArg); sonKod=kod; sonArg=arg;
-  if(!yeni)return;
-  if(kod===0x10&&hoca&&hoca.adimlar[arg]&&$('selSes').value==='1'){const a=hoca.adimlar[arg];const k=komutCal(a.ses||a.cue,a.cue);log('komut '+(arg+1)+'/'+hoca.adimlar.length+': '+a.cue+' ('+k+')')}
+  const oncekiKod=sonKod, oncekiArg=sonArg;
+  sonKod=kod; sonArg=arg;
+  if(kod===oncekiKod&&arg===oncekiArg)return;
+  if(rk&&a){
+    const yeniAdim=!(oncekiArg===arg&&(oncekiKod===0x10||oncekiKod===0x12));   // aynı adımda 0x10→0x12 yalnız yerleşme geçişidir
+    if(yeniAdim&&$('selSes').value==='1'){const k=komutCal(a.ses||a.cue,a.cue);log('komut '+(arg+1)+'/'+hoca.adimlar.length+': '+a.cue+' ('+k+')')}
+    if(kod===0x12){log('yerleşti '+(arg+1)+'/'+hoca.adimlar.length+': '+a.cue);yerlestiOlay(arg,a)}
+  }
   else if(kod===0x11)log('rehber bitti');
 }
+function yerlestiOlay(arg,a){}   // K48: öğrenci yerleşti; okuma kliplerinin kuyruğa girmesi buradan başlayacak (klip kuyruğu denemesi)
 async function sesToplu(files){   // birden çok dosyayı adlarına göre ses kimliklerine eşler (hoca_sabah.json: ses_dosya)
   const m=(hoca&&hoca.ses_dosya)||{};let n=0,yok=[];
   for(const f of files){const ad=f.name.toLowerCase().replace(/\.[^.]+$/,'');const id=Object.keys(m).find(k=>m[k]===ad);
