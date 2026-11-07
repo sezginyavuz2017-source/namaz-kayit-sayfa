@@ -203,6 +203,7 @@ async function idbGet(k){const d=await idb();return new Promise((res,rej)=>{cons
 function sesCtx(){if(!actx)actx=new (window.AudioContext||window.webkitAudioContext)();return actx}
 async function sesCoz(cue,blob){const ab=await blob.arrayBuffer();sesBuf[cue]=await sesCtx().decodeAudioData(ab)}
 function sesAc(){   // kullanıcı dokunuşunda çağrılır: ses bağlamı + ekran açık kalsın + telefon sesi açılsın
+  try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist()}catch(e){}   // yüklenen sesler tarayıcı temizliğinde silinmesin
   try{sesCtx().resume()}catch(e){}
   try{if(navigator.wakeLock)navigator.wakeLock.request('screen').then(x=>{wl=x}).catch(()=>{})}catch(e){}
   try{speechSynthesis.speak(new SpeechSynthesisUtterance(''))}catch(e){}
