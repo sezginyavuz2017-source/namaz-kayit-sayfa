@@ -281,6 +281,7 @@ function onRec(ev){
     tx.last=Date.now();
     if(tx.waitResume)return;
     if(seq!==tx.seq){resume('sıra bozuk');return}
+    tx.tries=0;   // ilerleme var: deneme sayacı yalnız ARDIŞIK ilerlemesiz denemeleri sayar (kayıplı bağlantıda uzun indirme tükenmesin)
     tx.seq=seq+1; tx.chunks.push(new Uint8Array(v.buffer.slice(v.byteOffset+3,v.byteOffset+v.byteLength)));
     tx.got+=v.byteLength-3; $('prog')&&($('prog').textContent=Math.round(100*tx.got/tx.size)+'%');
   }else if(t===0x83&&tx){
@@ -329,7 +330,7 @@ async function download(f){if(f.selR&&!f.selR.value){alert('Bu kayıt için reka
 }
 async function resume(why){
   if(!tx)return;
-  if(tx.tries>=6){log('HATA: indirme tamamlanamadı ('+tx.got+'/'+tx.size+')');tx=null;return}
+  if(tx.tries>=8){log('HATA: indirme tamamlanamadı ('+tx.got+'/'+tx.size+')');tx=null;return}
   tx.tries++; tx.waitResume=true; log('yeniden isteniyor ('+why+') bayt '+tx.got);
   await wr([2,tx.f.idx,tx.got&255,(tx.got>>8)&255,(tx.got>>16)&255,(tx.got>>>24)&255]);
   setTimeout(()=>{if(tx){tx.waitResume=false;tx.seq=0;tx.last=Date.now()}},300);
