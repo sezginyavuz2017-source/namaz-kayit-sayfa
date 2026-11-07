@@ -32,7 +32,7 @@
    "cue": "Semiallahu limen hamideh",
    "adim": "itidal",
    "rekat": 1,
-   "sure_sn": 10,
+   "sure_sn": 2,
    "ipucu": "dogrul, ayakta dur"
   },
   {
@@ -48,7 +48,7 @@
    "cue": "Allahu Ekber",
    "adim": "celse",
    "rekat": 1,
-   "sure_sn": 10,
+   "sure_sn": 2,
    "ipucu": "iki secde arasi otur"
   },
   {
@@ -80,7 +80,7 @@
    "cue": "Semiallahu limen hamideh",
    "adim": "itidal",
    "rekat": 2,
-   "sure_sn": 10,
+   "sure_sn": 2,
    "ipucu": "dogrul, ayakta dur"
   },
   {
@@ -96,7 +96,7 @@
    "cue": "Allahu Ekber",
    "adim": "celse",
    "rekat": 2,
-   "sure_sn": 10,
+   "sure_sn": 2,
    "ipucu": "iki secde arasi otur"
   },
   {
@@ -120,7 +120,7 @@
    "cue": "Esselamu aleykum ve rahmetullah",
    "adim": "selam",
    "rekat": 2,
-   "sure_sn": 10,
+   "sure_sn": 6,
    "ipucu": "saga selam ver"
   },
   {
@@ -128,7 +128,7 @@
    "cue": "Esselamu aleykum ve rahmetullah",
    "adim": "selam",
    "rekat": 2,
-   "sure_sn": 10,
+   "sure_sn": 6,
    "ipucu": "sola selam ver"
   }
  ]
