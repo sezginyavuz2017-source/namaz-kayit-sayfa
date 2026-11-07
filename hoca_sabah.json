@@ -16,7 +16,7 @@
    "cue": "Allahu Ekber",
    "adim": "kiyam",
    "rekat": 1,
-   "sure_sn": 40,
+   "sure_sn": 10,
    "ipucu": "ayakta dur, kiraati dinle"
   },
   {
@@ -24,7 +24,7 @@
    "cue": "Allahu Ekber",
    "adim": "ruku",
    "rekat": 1,
-   "sure_sn": 4,
+   "sure_sn": 10,
    "ipucu": "rukuda bekle"
   },
   {
@@ -32,7 +32,7 @@
    "cue": "Semiallahu limen hamideh",
    "adim": "itidal",
    "rekat": 1,
-   "sure_sn": 2,
+   "sure_sn": 10,
    "ipucu": "dogrul, ayakta dur"
   },
   {
@@ -40,7 +40,7 @@
    "cue": "Allahu Ekber",
    "adim": "secde",
    "rekat": 1,
-   "sure_sn": 4,
+   "sure_sn": 10,
    "ipucu": "secdede bekle"
   },
   {
@@ -48,7 +48,7 @@
    "cue": "Allahu Ekber",
    "adim": "celse",
    "rekat": 1,
-   "sure_sn": 2,
+   "sure_sn": 10,
    "ipucu": "iki secde arasi otur"
   },
   {
@@ -56,7 +56,7 @@
    "cue": "Allahu Ekber",
    "adim": "secde",
    "rekat": 1,
-   "sure_sn": 4,
+   "sure_sn": 10,
    "ipucu": "ikinci secdede bekle"
   },
   {
@@ -64,7 +64,7 @@
    "cue": "Allahu Ekber",
    "adim": "kiyam",
    "rekat": 2,
-   "sure_sn": 25,
+   "sure_sn": 10,
    "ipucu": "ikinci rekat, ayakta dur"
   },
   {
@@ -72,7 +72,7 @@
    "cue": "Allahu Ekber",
    "adim": "ruku",
    "rekat": 2,
-   "sure_sn": 4,
+   "sure_sn": 10,
    "ipucu": "rukuda bekle"
   },
   {
@@ -80,7 +80,7 @@
    "cue": "Semiallahu limen hamideh",
    "adim": "itidal",
    "rekat": 2,
-   "sure_sn": 2,
+   "sure_sn": 10,
    "ipucu": "dogrul, ayakta dur"
   },
   {
@@ -88,7 +88,7 @@
    "cue": "Allahu Ekber",
    "adim": "secde",
    "rekat": 2,
-   "sure_sn": 4,
+   "sure_sn": 10,
    "ipucu": "secdede bekle"
   },
   {
@@ -96,7 +96,7 @@
    "cue": "Allahu Ekber",
    "adim": "celse",
    "rekat": 2,
-   "sure_sn": 2,
+   "sure_sn": 10,
    "ipucu": "iki secde arasi otur"
   },
   {
@@ -104,7 +104,7 @@
    "cue": "Allahu Ekber",
    "adim": "secde",
    "rekat": 2,
-   "sure_sn": 4,
+   "sure_sn": 10,
    "ipucu": "ikinci secdede bekle"
   },
   {
@@ -112,7 +112,7 @@
    "cue": "Allahu Ekber",
    "adim": "kade",
    "rekat": 2,
-   "sure_sn": 30,
+   "sure_sn": 10,
    "ipucu": "son oturus, otur"
   },
   {
@@ -120,7 +120,7 @@
    "cue": "Esselamu aleykum ve rahmetullah",
    "adim": "selam",
    "rekat": 2,
-   "sure_sn": 4,
+   "sure_sn": 10,
    "ipucu": "saga selam ver"
   },
   {
@@ -128,7 +128,7 @@
    "cue": "Esselamu aleykum ve rahmetullah",
    "adim": "selam",
    "rekat": 2,
-   "sure_sn": 4,
+   "sure_sn": 10,
    "ipucu": "sola selam ver"
   }
  ]
