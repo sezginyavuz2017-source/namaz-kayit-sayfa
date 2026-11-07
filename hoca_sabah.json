@@ -120,8 +120,16 @@
    "cue": "Esselamu aleykum ve rahmetullah",
    "adim": "selam",
    "rekat": 2,
-   "sure_sn": 8,
-   "ipucu": "saga ve sola selam ver"
+   "sure_sn": 4,
+   "ipucu": "saga selam ver"
+  },
+  {
+   "ses": "selam",
+   "cue": "Esselamu aleykum ve rahmetullah",
+   "adim": "selam",
+   "rekat": 2,
+   "sure_sn": 4,
+   "ipucu": "sola selam ver"
   }
  ]
 }
