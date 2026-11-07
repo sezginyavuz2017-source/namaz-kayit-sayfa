@@ -209,12 +209,29 @@ function sesAc(){   // kullanıcı dokunuşunda çağrılır: ses bağlamı + ek
   try{speechSynthesis.speak(new SpeechSynthesisUtterance(''))}catch(e){}
 }
 function kirpGet(){try{return JSON.parse(localStorage.getItem('seskirp')||'{}')}catch(e){return{}}}
+// Sıralı çalma: yeni komut gelirken önceki ses sürüyorsa üst üste binmez, bitmesi beklenir (en fazla 1 bekleyen: gecikmiş eski komut birikmez).
+let sesBekle=null, sesCalan=false;
+function sesSiradaki(){
+  if(sesCalan||!sesBekle)return;
+  const f=sesBekle; sesBekle=null; sesCalan=true;
+  let bitti=false; const son=()=>{if(bitti)return;bitti=true;sesCalan=false;sesSiradaki()};
+  try{f(son)}catch(e){son()}
+}
 function komutCal(cue,metin){   // cue = ses kimliği (kalkis/kisa/...); metin = ses dosyası yoksa telefonun okuyacağı yazı
-  try{if(sesBuf[cue]){const k=kirpGet()[cue]||{},b=+k.b||0,e=+k.s||0;   // uzun kayıttan (örn. mp4) yalnız [baş, son] saniye aralığı çalınır
-    const s=sesCtx().createBufferSource();s.buffer=sesBuf[cue];s.connect(sesCtx().destination);
-    if(e>b)s.start(0,b,e-b);else s.start(0,b);return 'dosya'}}catch(e){}
-  try{const u=new SpeechSynthesisUtterance(metin||cue);u.lang='tr-TR';speechSynthesis.cancel();speechSynthesis.speak(u);return 'telefon sesi'}catch(e){}
-  return 'ses yok';
+  const dosya=!!sesBuf[cue];
+  sesBekle=(son)=>{
+    if(dosya){
+      const k=kirpGet()[cue]||{},b=+k.b||0,e=+k.s||0;   // uzun kayıttan (örn. mp4) yalnız [baş, son] saniye aralığı çalınır
+      const s=sesCtx().createBufferSource();s.buffer=sesBuf[cue];s.connect(sesCtx().destination);
+      const sure=(e>b?e-b:Math.max(0,s.buffer.duration-b));
+      s.onended=son; setTimeout(son,(sure+1)*1000);   // yedek: onended gelmezse takılmasın
+      if(e>b)s.start(0,b,e-b);else s.start(0,b);
+    }else{
+      try{const u=new SpeechSynthesisUtterance(metin||cue);u.lang='tr-TR';u.onend=son;u.onerror=son;speechSynthesis.speak(u);setTimeout(son,6000)}catch(e){son()}
+    }
+  };
+  sesSiradaki();
+  return dosya?'dosya':'telefon sesi';
 }
 function komutOlay(v){
   const kod=v.getUint8(17), arg=v.getUint8(18);
