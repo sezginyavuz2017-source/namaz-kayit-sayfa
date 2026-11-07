@@ -1,8 +1,6 @@
 {
- "kural": "sabah_farzi_hoca_komutlari",
- "kaynak": "TBD (Diyanet İlmihali, namaz bölümü; cilt/sayfa)",
+ "kural": "hoca_komutlari",
  "dogrulandi": false,
- "rekat": 2,
  "ses_dosya": {
   "kalkis": "allahuekber_kalkis",
   "kisa": "allahuekber_kisa",
@@ -10,6 +8,23 @@
   "selam": "esselamunaleykum",
   "itidal": "semiallahulimenhamideh"
  },
+ "planlar": [
+  {
+   "rekat": 2,
+   "kural": "sabah_farzi_hoca_komutlari",
+   "kaynak": "TBD (Diyanet İlmihali, namaz bölümü; cilt/sayfa)"
+  },
+  {
+   "rekat": 3,
+   "kural": "aksam_farzi_hoca_komutlari",
+   "kaynak": "TBD (Diyanet Ilmihali, namaz bolumu; cilt/sayfa)"
+  },
+  {
+   "rekat": 4,
+   "kural": "dort_rekat_farzi_hoca_komutlari",
+   "kaynak": "TBD (Diyanet Ilmihali, namaz bolumu; cilt/sayfa)"
+  }
+ ],
  "adimlar": [
   {
    "ses": "oturus",
@@ -17,7 +32,10 @@
    "adim": "kiyam",
    "rekat": 1,
    "sure_sn": 10,
-   "ipucu": "ayakta dur, kiraati dinle"
+   "ipucu": "ayakta dur, kiraati dinle",
+   "plan": 2,
+   "i": 1,
+   "n": 15
   },
   {
    "ses": "kisa",
@@ -25,7 +43,10 @@
    "adim": "ruku",
    "rekat": 1,
    "sure_sn": 3,
-   "ipucu": "rukuda bekle"
+   "ipucu": "rukuda bekle",
+   "plan": 2,
+   "i": 2,
+   "n": 15
   },
   {
    "ses": "itidal",
@@ -33,7 +54,10 @@
    "adim": "itidal",
    "rekat": 1,
    "sure_sn": 2,
-   "ipucu": "dogrul, ayakta dur"
+   "ipucu": "dogrul, ayakta dur",
+   "plan": 2,
+   "i": 3,
+   "n": 15
   },
   {
    "ses": "kisa",
@@ -41,7 +65,10 @@
    "adim": "secde",
    "rekat": 1,
    "sure_sn": 3,
-   "ipucu": "secdede bekle"
+   "ipucu": "secdede bekle",
+   "plan": 2,
+   "i": 4,
+   "n": 15
   },
   {
    "ses": "kisa",
@@ -49,7 +76,10 @@
    "adim": "celse",
    "rekat": 1,
    "sure_sn": 2,
-   "ipucu": "iki secde arasi otur"
+   "ipucu": "iki secde arasi otur",
+   "plan": 2,
+   "i": 5,
+   "n": 15
   },
   {
    "ses": "kisa",
@@ -57,7 +87,10 @@
    "adim": "secde",
    "rekat": 1,
    "sure_sn": 3,
-   "ipucu": "ikinci secdede bekle"
+   "ipucu": "ikinci secdede bekle",
+   "plan": 2,
+   "i": 6,
+   "n": 15
   },
   {
    "ses": "kisa",
@@ -65,7 +98,10 @@
    "adim": "kiyam",
    "rekat": 2,
    "sure_sn": 10,
-   "ipucu": "ikinci rekat, ayakta dur"
+   "ipucu": "ikinci rekat, ayakta dur",
+   "plan": 2,
+   "i": 7,
+   "n": 15
   },
   {
    "ses": "kisa",
@@ -73,7 +109,10 @@
    "adim": "ruku",
    "rekat": 2,
    "sure_sn": 3,
-   "ipucu": "rukuda bekle"
+   "ipucu": "rukuda bekle",
+   "plan": 2,
+   "i": 8,
+   "n": 15
   },
   {
    "ses": "itidal",
@@ -81,7 +120,10 @@
    "adim": "itidal",
    "rekat": 2,
    "sure_sn": 2,
-   "ipucu": "dogrul, ayakta dur"
+   "ipucu": "dogrul, ayakta dur",
+   "plan": 2,
+   "i": 9,
+   "n": 15
   },
   {
    "ses": "kisa",
@@ -89,7 +131,10 @@
    "adim": "secde",
    "rekat": 2,
    "sure_sn": 3,
-   "ipucu": "secdede bekle"
+   "ipucu": "secdede bekle",
+   "plan": 2,
+   "i": 10,
+   "n": 15
   },
   {
    "ses": "kisa",
@@ -97,7 +142,10 @@
    "adim": "celse",
    "rekat": 2,
    "sure_sn": 2,
-   "ipucu": "iki secde arasi otur"
+   "ipucu": "iki secde arasi otur",
+   "plan": 2,
+   "i": 11,
+   "n": 15
   },
   {
    "ses": "kisa",
@@ -105,7 +153,10 @@
    "adim": "secde",
    "rekat": 2,
    "sure_sn": 3,
-   "ipucu": "ikinci secdede bekle"
+   "ipucu": "ikinci secdede bekle",
+   "plan": 2,
+   "i": 12,
+   "n": 15
   },
   {
    "ses": "oturus",
@@ -113,7 +164,10 @@
    "adim": "kade",
    "rekat": 2,
    "sure_sn": 10,
-   "ipucu": "son oturus, otur"
+   "ipucu": "son oturus, otur",
+   "plan": 2,
+   "i": 13,
+   "n": 15
   },
   {
    "ses": "selam",
@@ -121,7 +175,10 @@
    "adim": "selam",
    "rekat": 2,
    "sure_sn": 6,
-   "ipucu": "saga selam ver"
+   "ipucu": "saga selam ver",
+   "plan": 2,
+   "i": 14,
+   "n": 15
   },
   {
    "ses": "selam",
@@ -129,7 +186,560 @@
    "adim": "selam",
    "rekat": 2,
    "sure_sn": 6,
-   "ipucu": "sola selam ver"
+   "ipucu": "sola selam ver",
+   "plan": 2,
+   "i": 15,
+   "n": 15
+  },
+  {
+   "ses": "oturus",
+   "cue": "Allahu Ekber",
+   "adim": "kiyam",
+   "rekat": 1,
+   "sure_sn": 10,
+   "ipucu": "ayakta dur, kiraati dinle",
+   "plan": 3,
+   "i": 1,
+   "n": 22
+  },
+  {
+   "ses": "kisa",
+   "cue": "Allahu Ekber",
+   "adim": "ruku",
+   "rekat": 1,
+   "sure_sn": 3,
+   "ipucu": "rukuda bekle",
+   "plan": 3,
+   "i": 2,
+   "n": 22
+  },
+  {
+   "ses": "itidal",
+   "cue": "Semiallahu limen hamideh",
+   "adim": "itidal",
+   "rekat": 1,
+   "sure_sn": 2,
+   "ipucu": "dogrul, ayakta dur",
+   "plan": 3,
+   "i": 3,
+   "n": 22
+  },
+  {
+   "ses": "kisa",
+   "cue": "Allahu Ekber",
+   "adim": "secde",
+   "rekat": 1,
+   "sure_sn": 3,
+   "ipucu": "secdede bekle",
+   "plan": 3,
+   "i": 4,
+   "n": 22
+  },
+  {
+   "ses": "kisa",
+   "cue": "Allahu Ekber",
+   "adim": "celse",
+   "rekat": 1,
+   "sure_sn": 2,
+   "ipucu": "iki secde arasi otur",
+   "plan": 3,
+   "i": 5,
+   "n": 22
+  },
+  {
+   "ses": "kisa",
+   "cue": "Allahu Ekber",
+   "adim": "secde",
+   "rekat": 1,
+   "sure_sn": 3,
+   "ipucu": "ikinci secdede bekle",
+   "plan": 3,
+   "i": 6,
+   "n": 22
+  },
+  {
+   "ses": "kisa",
+   "cue": "Allahu Ekber",
+   "adim": "kiyam",
+   "rekat": 2,
+   "sure_sn": 10,
+   "ipucu": "ikinci rekat, ayakta dur",
+   "plan": 3,
+   "i": 7,
+   "n": 22
+  },
+  {
+   "ses": "kisa",
+   "cue": "Allahu Ekber",
+   "adim": "ruku",
+   "rekat": 2,
+   "sure_sn": 3,
+   "ipucu": "rukuda bekle",
+   "plan": 3,
+   "i": 8,
+   "n": 22
+  },
+  {
+   "ses": "itidal",
+   "cue": "Semiallahu limen hamideh",
+   "adim": "itidal",
+   "rekat": 2,
+   "sure_sn": 2,
+   "ipucu": "dogrul, ayakta dur",
+   "plan": 3,
+   "i": 9,
+   "n": 22
+  },
+  {
+   "ses": "kisa",
+   "cue": "Allahu Ekber",
+   "adim": "secde",
+   "rekat": 2,
+   "sure_sn": 3,
+   "ipucu": "secdede bekle",
+   "plan": 3,
+   "i": 10,
+   "n": 22
+  },
+  {
+   "ses": "kisa",
+   "cue": "Allahu Ekber",
+   "adim": "celse",
+   "rekat": 2,
+   "sure_sn": 2,
+   "ipucu": "iki secde arasi otur",
+   "plan": 3,
+   "i": 11,
+   "n": 22
+  },
+  {
+   "ses": "kisa",
+   "cue": "Allahu Ekber",
+   "adim": "secde",
+   "rekat": 2,
+   "sure_sn": 3,
+   "ipucu": "ikinci secdede bekle",
+   "plan": 3,
+   "i": 12,
+   "n": 22
+  },
+  {
+   "ses": "oturus",
+   "cue": "Allahu Ekber",
+   "adim": "kade",
+   "rekat": 2,
+   "sure_sn": 10,
+   "ipucu": "ilk oturus, otur",
+   "plan": 3,
+   "i": 13,
+   "n": 22
+  },
+  {
+   "ses": "kisa",
+   "cue": "Allahu Ekber",
+   "adim": "kiyam",
+   "rekat": 3,
+   "sure_sn": 10,
+   "ipucu": "ucuncu rekat, ayakta dur",
+   "plan": 3,
+   "i": 14,
+   "n": 22
+  },
+  {
+   "ses": "kisa",
+   "cue": "Allahu Ekber",
+   "adim": "ruku",
+   "rekat": 3,
+   "sure_sn": 3,
+   "ipucu": "rukuda bekle",
+   "plan": 3,
+   "i": 15,
+   "n": 22
+  },
+  {
+   "ses": "itidal",
+   "cue": "Semiallahu limen hamideh",
+   "adim": "itidal",
+   "rekat": 3,
+   "sure_sn": 2,
+   "ipucu": "dogrul, ayakta dur",
+   "plan": 3,
+   "i": 16,
+   "n": 22
+  },
+  {
+   "ses": "kisa",
+   "cue": "Allahu Ekber",
+   "adim": "secde",
+   "rekat": 3,
+   "sure_sn": 3,
+   "ipucu": "secdede bekle",
+   "plan": 3,
+   "i": 17,
+   "n": 22
+  },
+  {
+   "ses": "kisa",
+   "cue": "Allahu Ekber",
+   "adim": "celse",
+   "rekat": 3,
+   "sure_sn": 2,
+   "ipucu": "iki secde arasi otur",
+   "plan": 3,
+   "i": 18,
+   "n": 22
+  },
+  {
+   "ses": "kisa",
+   "cue": "Allahu Ekber",
+   "adim": "secde",
+   "rekat": 3,
+   "sure_sn": 3,
+   "ipucu": "ikinci secdede bekle",
+   "plan": 3,
+   "i": 19,
+   "n": 22
+  },
+  {
+   "ses": "oturus",
+   "cue": "Allahu Ekber",
+   "adim": "kade",
+   "rekat": 3,
+   "sure_sn": 10,
+   "ipucu": "son oturus, otur",
+   "plan": 3,
+   "i": 20,
+   "n": 22
+  },
+  {
+   "ses": "selam",
+   "cue": "Esselamu aleykum ve rahmetullah",
+   "adim": "selam",
+   "rekat": 3,
+   "sure_sn": 6,
+   "ipucu": "saga selam ver",
+   "plan": 3,
+   "i": 21,
+   "n": 22
+  },
+  {
+   "ses": "selam",
+   "cue": "Esselamu aleykum ve rahmetullah",
+   "adim": "selam",
+   "rekat": 3,
+   "sure_sn": 6,
+   "ipucu": "sola selam ver",
+   "plan": 3,
+   "i": 22,
+   "n": 22
+  },
+  {
+   "ses": "oturus",
+   "cue": "Allahu Ekber",
+   "adim": "kiyam",
+   "rekat": 1,
+   "sure_sn": 10,
+   "ipucu": "ayakta dur, kiraati dinle",
+   "plan": 4,
+   "i": 1,
+   "n": 28
+  },
+  {
+   "ses": "kisa",
+   "cue": "Allahu Ekber",
+   "adim": "ruku",
+   "rekat": 1,
+   "sure_sn": 3,
+   "ipucu": "rukuda bekle",
+   "plan": 4,
+   "i": 2,
+   "n": 28
+  },
+  {
+   "ses": "itidal",
+   "cue": "Semiallahu limen hamideh",
+   "adim": "itidal",
+   "rekat": 1,
+   "sure_sn": 2,
+   "ipucu": "dogrul, ayakta dur",
+   "plan": 4,
+   "i": 3,
+   "n": 28
+  },
+  {
+   "ses": "kisa",
+   "cue": "Allahu Ekber",
+   "adim": "secde",
+   "rekat": 1,
+   "sure_sn": 3,
+   "ipucu": "secdede bekle",
+   "plan": 4,
+   "i": 4,
+   "n": 28
+  },
+  {
+   "ses": "kisa",
+   "cue": "Allahu Ekber",
+   "adim": "celse",
+   "rekat": 1,
+   "sure_sn": 2,
+   "ipucu": "iki secde arasi otur",
+   "plan": 4,
+   "i": 5,
+   "n": 28
+  },
+  {
+   "ses": "kisa",
+   "cue": "Allahu Ekber",
+   "adim": "secde",
+   "rekat": 1,
+   "sure_sn": 3,
+   "ipucu": "ikinci secdede bekle",
+   "plan": 4,
+   "i": 6,
+   "n": 28
+  },
+  {
+   "ses": "kisa",
+   "cue": "Allahu Ekber",
+   "adim": "kiyam",
+   "rekat": 2,
+   "sure_sn": 10,
+   "ipucu": "ikinci rekat, ayakta dur",
+   "plan": 4,
+   "i": 7,
+   "n": 28
+  },
+  {
+   "ses": "kisa",
+   "cue": "Allahu Ekber",
+   "adim": "ruku",
+   "rekat": 2,
+   "sure_sn": 3,
+   "ipucu": "rukuda bekle",
+   "plan": 4,
+   "i": 8,
+   "n": 28
+  },
+  {
+   "ses": "itidal",
+   "cue": "Semiallahu limen hamideh",
+   "adim": "itidal",
+   "rekat": 2,
+   "sure_sn": 2,
+   "ipucu": "dogrul, ayakta dur",
+   "plan": 4,
+   "i": 9,
+   "n": 28
+  },
+  {
+   "ses": "kisa",
+   "cue": "Allahu Ekber",
+   "adim": "secde",
+   "rekat": 2,
+   "sure_sn": 3,
+   "ipucu": "secdede bekle",
+   "plan": 4,
+   "i": 10,
+   "n": 28
+  },
+  {
+   "ses": "kisa",
+   "cue": "Allahu Ekber",
+   "adim": "celse",
+   "rekat": 2,
+   "sure_sn": 2,
+   "ipucu": "iki secde arasi otur",
+   "plan": 4,
+   "i": 11,
+   "n": 28
+  },
+  {
+   "ses": "kisa",
+   "cue": "Allahu Ekber",
+   "adim": "secde",
+   "rekat": 2,
+   "sure_sn": 3,
+   "ipucu": "ikinci secdede bekle",
+   "plan": 4,
+   "i": 12,
+   "n": 28
+  },
+  {
+   "ses": "oturus",
+   "cue": "Allahu Ekber",
+   "adim": "kade",
+   "rekat": 2,
+   "sure_sn": 10,
+   "ipucu": "ilk oturus, otur",
+   "plan": 4,
+   "i": 13,
+   "n": 28
+  },
+  {
+   "ses": "kisa",
+   "cue": "Allahu Ekber",
+   "adim": "kiyam",
+   "rekat": 3,
+   "sure_sn": 10,
+   "ipucu": "ucuncu rekat, ayakta dur",
+   "plan": 4,
+   "i": 14,
+   "n": 28
+  },
+  {
+   "ses": "kisa",
+   "cue": "Allahu Ekber",
+   "adim": "ruku",
+   "rekat": 3,
+   "sure_sn": 3,
+   "ipucu": "rukuda bekle",
+   "plan": 4,
+   "i": 15,
+   "n": 28
+  },
+  {
+   "ses": "itidal",
+   "cue": "Semiallahu limen hamideh",
+   "adim": "itidal",
+   "rekat": 3,
+   "sure_sn": 2,
+   "ipucu": "dogrul, ayakta dur",
+   "plan": 4,
+   "i": 16,
+   "n": 28
+  },
+  {
+   "ses": "kisa",
+   "cue": "Allahu Ekber",
+   "adim": "secde",
+   "rekat": 3,
+   "sure_sn": 3,
+   "ipucu": "secdede bekle",
+   "plan": 4,
+   "i": 17,
+   "n": 28
+  },
+  {
+   "ses": "kisa",
+   "cue": "Allahu Ekber",
+   "adim": "celse",
+   "rekat": 3,
+   "sure_sn": 2,
+   "ipucu": "iki secde arasi otur",
+   "plan": 4,
+   "i": 18,
+   "n": 28
+  },
+  {
+   "ses": "kisa",
+   "cue": "Allahu Ekber",
+   "adim": "secde",
+   "rekat": 3,
+   "sure_sn": 3,
+   "ipucu": "ikinci secdede bekle",
+   "plan": 4,
+   "i": 19,
+   "n": 28
+  },
+  {
+   "ses": "kisa",
+   "cue": "Allahu Ekber",
+   "adim": "kiyam",
+   "rekat": 4,
+   "sure_sn": 10,
+   "ipucu": "dorduncu rekat, ayakta dur",
+   "plan": 4,
+   "i": 20,
+   "n": 28
+  },
+  {
+   "ses": "kisa",
+   "cue": "Allahu Ekber",
+   "adim": "ruku",
+   "rekat": 4,
+   "sure_sn": 3,
+   "ipucu": "rukuda bekle",
+   "plan": 4,
+   "i": 21,
+   "n": 28
+  },
+  {
+   "ses": "itidal",
+   "cue": "Semiallahu limen hamideh",
+   "adim": "itidal",
+   "rekat": 4,
+   "sure_sn": 2,
+   "ipucu": "dogrul, ayakta dur",
+   "plan": 4,
+   "i": 22,
+   "n": 28
+  },
+  {
+   "ses": "kisa",
+   "cue": "Allahu Ekber",
+   "adim": "secde",
+   "rekat": 4,
+   "sure_sn": 3,
+   "ipucu": "secdede bekle",
+   "plan": 4,
+   "i": 23,
+   "n": 28
+  },
+  {
+   "ses": "kisa",
+   "cue": "Allahu Ekber",
+   "adim": "celse",
+   "rekat": 4,
+   "sure_sn": 2,
+   "ipucu": "iki secde arasi otur",
+   "plan": 4,
+   "i": 24,
+   "n": 28
+  },
+  {
+   "ses": "kisa",
+   "cue": "Allahu Ekber",
+   "adim": "secde",
+   "rekat": 4,
+   "sure_sn": 3,
+   "ipucu": "ikinci secdede bekle",
+   "plan": 4,
+   "i": 25,
+   "n": 28
+  },
+  {
+   "ses": "oturus",
+   "cue": "Allahu Ekber",
+   "adim": "kade",
+   "rekat": 4,
+   "sure_sn": 10,
+   "ipucu": "son oturus, otur",
+   "plan": 4,
+   "i": 26,
+   "n": 28
+  },
+  {
+   "ses": "selam",
+   "cue": "Esselamu aleykum ve rahmetullah",
+   "adim": "selam",
+   "rekat": 4,
+   "sure_sn": 6,
+   "ipucu": "saga selam ver",
+   "plan": 4,
+   "i": 27,
+   "n": 28
+  },
+  {
+   "ses": "selam",
+   "cue": "Esselamu aleykum ve rahmetullah",
+   "adim": "selam",
+   "rekat": 4,
+   "sure_sn": 6,
+   "ipucu": "sola selam ver",
+   "plan": 4,
+   "i": 28,
+   "n": 28
   }
  ]
 }

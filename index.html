@@ -245,8 +245,8 @@ function komutOlay(v){
   if(kod===oncekiKod&&arg===oncekiArg)return;
   if(rk&&a){
     const yeniAdim=!(oncekiArg===arg&&(oncekiKod===0x10||oncekiKod===0x12));   // aynı adımda 0x10→0x12 yalnız yerleşme geçişidir
-    if(yeniAdim&&$('selSes').value==='1'){const k=komutCal(a.ses||a.cue,a.cue);log('komut '+(arg+1)+'/'+hoca.adimlar.length+': '+a.cue+' ('+k+')')}
-    if(kod===0x12){log('yerleşti '+(arg+1)+'/'+hoca.adimlar.length+': '+a.cue);yerlestiOlay(arg,a)}
+    if(yeniAdim&&$('selSes').value==='1'){const k=komutCal(a.ses||a.cue,a.cue);log('komut '+(a.i||arg+1)+'/'+(a.n||hoca.adimlar.length)+': '+a.cue+' ('+k+')')}
+    if(kod===0x12){log('yerleşti '+(a.i||arg+1)+'/'+(a.n||hoca.adimlar.length)+': '+a.cue);yerlestiOlay(arg,a)}
   }
   else if(kod===0x11)log('rehber bitti');
 }
