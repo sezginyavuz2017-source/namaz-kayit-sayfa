@@ -34,7 +34,7 @@
   <div class="row"><span>Kategori</span>
     <select id="selKat"><option value="standart">Standart</option><option value="bayan">Bayan</option><option value="engelli">Engelli</option><option value="oturarak">Oturarak namaz</option><option value="aci_zorlanan">Açılarda zorlanan</option></select></div>
   <div class="row"><span>Rekat</span>
-    <select id="selRek"><option value="">seç…</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="0">belirsiz</option></select></div>
+    <select id="selRek"><option value="">seç…</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select></div>
   <div class="row"><span>Radar</span>
     <select id="selRad"><option value="">seç…</option><option value="0">Radar yok (radarsız kayıt)</option><option value="1">Radar var, konumlandı</option><option value="2">Radar var, devre dışı</option></select></div>
   <div id="pnRad" style="display:none">
@@ -325,7 +325,7 @@ function renderFiles(){
     const sv=nGet()[nKey(f)]||{}, m0=findMeta(f.epoch)||{};
     const m={kat:sv.kat||m0.kat||$('selKat').value, rek:(sv.rek?sv.rek:(m0.rek!==undefined?m0.rek:$('selRek').value)), not:(sv.not!==undefined?sv.not:(m0.not||''))};
     const sk=document.createElement('select'); Object.keys(KAT).forEach(k=>{const o=document.createElement('option');o.value=k;o.textContent=KAT[k];if(k===m.kat)o.selected=true;sk.append(o)});
-    const sr=document.createElement('select'); ['','2','3','4','0'].forEach(k=>{const o=document.createElement('option');o.value=k;o.textContent=k===''?'rekat seç…':k==='0'?'belirsiz':k+' rekat';if(k===String(m.rek))o.selected=true;sr.append(o)});
+    const sr=document.createElement('select'); ['','2','3','4'].forEach(k=>{const o=document.createElement('option');o.value=k;o.textContent=k===''?'rekat seç…':k==='0'?'belirsiz':k+' rekat';if(k===String(m.rek))o.selected=true;sr.append(o)});
     const tn=document.createElement('textarea'); tn.rows=2; tn.placeholder='Not'; tn.value=(m.not||''); tn.style.flex='1 1 100%';
 const st=document.createElement('small'); st.style.flex='1 1 100%'; st.style.color='#8c8'; st.textContent=(sv.not!==undefined||sv.kat||sv.rek!==undefined)?'✓ kayıtlı':'';
     const ok=()=>{st.textContent='✓ kaydedildi '+new Date().toLocaleTimeString()};
