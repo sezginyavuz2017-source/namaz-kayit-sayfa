@@ -318,7 +318,8 @@ async function list(){listEntries=[];await wr([1]);log('liste istendi')}
 function renderFiles(){
   const d=$('files'); d.innerHTML='';
   if(!listEntries.length){d.textContent='Kayıt yok.';return}
-  listEntries.forEach(f=>{
+  // En yeni kayıt en üstte (kullanıcı isteği 2026-11-09: aşağı kaydırmak gerekmesin); her satır kendi f.idx'iyle çalışır, yalnız gösterim sırası değişir
+  listEntries.filter(Boolean).sort((a,b)=>(b.epoch-a.epoch)||(b.idx-a.idx)).forEach(f=>{
     const el=document.createElement('div'); el.className='file';
     const when=f.epoch?new Date(f.epoch*1000).toLocaleString():'(saat yok)';
     el.innerHTML='<span>#'+(f.idx+1)+' '+when+'<br><small>'+Math.round(f.size/100)/10+' KB, ~'+Math.round((f.size-16)/10/10/60*10)/10+' dk</small></span>';
