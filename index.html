@@ -118,7 +118,7 @@ async function connect(){
     dev.addEventListener('gattserverdisconnected',()=>{$('sConn').textContent='koptu';enable(false)});
     const s=await dev.gatt.connect(); const svc=await s.getPrimaryService(SVC);
     cs=await svc.getCharacteristic(C_STATUS); cset=await svc.getCharacteristic(C_SET); crec=await svc.getCharacteristic(C_REC);
-    cs.addEventListener('characteristicvaluechanged',onStatus); await cs.startNotifications();
+    statusInit=false; cs.addEventListener('characteristicvaluechanged',onStatus); await cs.startNotifications();
     crec.addEventListener('characteristicvaluechanged',onRec); await crec.startNotifications();
     $('sConn').textContent='bağlı'; enable(true);
     await setTime(); log('saat gönderildi');
@@ -131,9 +131,19 @@ function onStatus(ev){
   const fl=v.getUint8(5), err=v.getUint8(8), batt=v.getUint8(13);
   $('sYaka').textContent= err==6?'eşleşme bekliyor': err==1||batt==255?'bağlı değil':('bağlı, pil %'+batt);
   recOn=!!(fl&0x10); $('sRec').textContent=recOn?'KAYITTA':'kapalı';
+  const was=statusInit?prevRec:recOn; prevRec=recOn; statusInit=true;   // bağlanınca ilk bildirim: kayıt zaten sürüyorsa dokunma
+  if(recOn&&!was&&Date.now()-selfStartMs>10000)autoTag();   // kayıt Kule'de başladı (çift vuruş / düğme): sayfadaki seçimler kayda yazılır
   $('sKonum').textContent=['bekliyor','takipte','belirsiz','kayıp','bitti'][v.getUint8(3)]+' / adım '+v.getUint8(2);
 }
 
+// Kayıt çift vuruşla ya da Kule düğmesiyle başlayınca sayfa bunu yalnız durum bildiriminden görür; radar konumu, kategori, rekat ve not
+// önceden yalnız sayfadaki "Başlat" ile yazılıyordu (2026-11-09: çift vuruşlu dört kayıtta radar_modu "belirtilmedi" çıktı). Şimdi aynısı burada.
+let prevRec=false, statusInit=false, selfStartMs=0;   // selfStartMs: sayfanın kendi "Başlat"ı (o zaman startRec zaten yazar)
+function autoTag(){
+  log("kayıt Kule'de başladı: sayfadaki seçimler (radar konumu, kategori, rekat, not) kayda yazılıyor");
+  saveMeta(Math.floor(Date.now()/1000),$('selKat').value,$('selRek').value,composeNote($('txtNot').value));
+  setTimeout(()=>{const t=$('txtNot').value;enqueue(async()=>{await setFlag(0xFE,encFlags(0,$('selKat').value,$('selRek').value));if(t||radTag())await sendGlobalNote()})},1500);
+}
 async function setTime(){
   const e=Math.floor(Date.now()/1000), b=new Uint8Array([0x40,4,e&255,(e>>8)&255,(e>>16)&255,(e>>>24)&255]);
   await cset.writeValue(b);
@@ -283,7 +293,7 @@ function sesArayuz(){
 }
 const wr=b=>crec.writeValue(new Uint8Array(b));
 
-async function startRec(){if(!$('selRek').value){alert('Önce rekat sayısını seç');return}if(rad.m===''){alert('Önce radar durumunu seç');return}saveMeta(Math.floor(Date.now()/1000),$('selKat').value,$('selRek').value,composeNote($('txtNot').value));await setTime();await cset.writeValue(new Uint8Array([0x41,1,1]));log('kayıt başlatma gönderildi');setTimeout(()=>{const t=$('txtNot').value;enqueue(async()=>{await setFlag(0xFE,encFlags(0,$('selKat').value,$('selRek').value));if(t||radTag())await sendGlobalNote()})},1500)}
+async function startRec(){if(!$('selRek').value){alert('Önce rekat sayısını seç');return}if(rad.m===''){alert('Önce radar durumunu seç');return}saveMeta(Math.floor(Date.now()/1000),$('selKat').value,$('selRek').value,composeNote($('txtNot').value));await setTime();selfStartMs=Date.now();await cset.writeValue(new Uint8Array([0x41,1,1]));log('kayıt başlatma gönderildi');setTimeout(()=>{const t=$('txtNot').value;enqueue(async()=>{await setFlag(0xFE,encFlags(0,$('selKat').value,$('selRek').value));if(t||radTag())await sendGlobalNote()})},1500)}
 async function stopRec(){const t=$('txtNot').value;if(t||radTag())await enqueue(()=>sendGlobalNote());await cset.writeValue(new Uint8Array([0x41,1,0]));log('kayıt bitirme gönderildi');$('txtNot').value='';$('selRek').value='';$('stNot').textContent=''}
 
 function onRec(ev){
