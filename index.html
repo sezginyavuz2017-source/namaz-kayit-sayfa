@@ -62,7 +62,9 @@
 <div class="box">
   <div class="row"><span>Sesli komut (hoca)</span>
     <select id="selSes"><option value="1">Açık</option><option value="0">Kapalı</option></select></div>
-  <small>Kule hoca komutunu bildirince telefon çalar (hoparlör/kulaklık). Dosya yüklemezsen telefonun Türkçe sesi komutu okur. Bağlanınca ekran açık kalır.</small>
+  <div class="row"><span>Tarif (komuttan sonra)</span>
+    <select id="selTarif"><option value="1">İlk seferde</option><option value="2">Her seferinde</option><option value="0">Kapalı</option></select></div>
+  <small>Kule hoca komutunu bildirince telefon çalar (hoparlör/kulaklık). Dosya yüklemezsen telefonun Türkçe sesi komutu okur. Tarif: tekbirden sonra o hareketin tarifi çalar (yalnız yüklenmiş tarif dosyası varsa; ör. guven_hoca__tarif_ruku.mp3). Tarif sürerken gelen tekbir, tarif bitince çalar: tekbiri duyunca hareket et (Kule hareketini bekler). Bağlanınca ekran açık kalır.</small>
   <div id="sesDosya"></div>
 </div>
 <div id="log"></div>
@@ -221,20 +223,25 @@ function sesAc(){   // kullanıcı dokunuşunda çağrılır: ses bağlamı + ek
   try{speechSynthesis.speak(new SpeechSynthesisUtterance(''))}catch(e){}
 }
 function kirpGet(){try{return JSON.parse(localStorage.getItem('seskirp')||'{}')}catch(e){return{}}}
-// Sıralı çalma: yeni komut gelirken önceki ses sürüyorsa üst üste binmez, bitmesi beklenir (en fazla 1 bekleyen: gecikmiş eski komut birikmez).
-let sesBekle=null, sesCalan=false;
+// Sıralı çalma kuyruğu (K48 klip kuyruğu denemesi): komut (tekbir) ve ardından tarif. Yeni komut gelince henüz başlamamış bekleyenler
+// atılır (eski sesler birikmez), ama SÜREN ses kesilmez: tarif bitince yeni tekbir çalar. Kule rehberi her komuttan sonra hareketi
+// bekler (≤25 sn), öğrenci tekbiri duyunca hareket eder; tarifler (rükû ~11, secde ~18 sn) kısa tutuşlardan uzun olduğu için kesmek
+// tarifi hep yarıda bırakırdı (2026-11-11 simülasyonu).
+let sesKuyruk=[], sesCalan=false, sesKaynak=null, sesCalanTur='';
 function sesSiradaki(){
-  if(sesCalan||!sesBekle)return;
-  const f=sesBekle; sesBekle=null; sesCalan=true;
-  let bitti=false; const son=()=>{if(bitti)return;bitti=true;sesCalan=false;sesSiradaki()};
-  try{f(son)}catch(e){son()}
+  if(sesCalan||!sesKuyruk.length)return;
+  const it=sesKuyruk.shift(); sesCalan=true; sesCalanTur=it.tur;
+  let bitti=false; const son=()=>{if(bitti)return;bitti=true;sesCalan=false;sesKaynak=null;sesCalanTur='';sesSiradaki()};
+  try{it.f(son)}catch(e){son()}
 }
-function komutCal(cue,metin){   // cue = ses kimliği (kalkis/kisa/...); metin = ses dosyası yoksa telefonun okuyacağı yazı
+function komutCal(cue,metin,tur){   // cue = ses kimliği (kisa/oturus/... ya da tarif_ruku/...); metin = dosya yoksa telefonun okuyacağı yazı (yalnız komut)
+  tur=tur||'komut';
   const dosya=!!sesBuf[cue];
-  sesBekle=(son)=>{
+  if(tur==='tarif'&&!dosya)return 'yok';           // tarif telefon sesiyle okunmaz (kullanıcı: telefon sesi kötü)
+  const f=(son)=>{
     if(dosya){
       const k=kirpGet()[cue]||{},b=+k.b||0,e=+k.s||0;   // uzun kayıttan (örn. mp4) yalnız [baş, son] saniye aralığı çalınır
-      const s=sesCtx().createBufferSource();s.buffer=sesBuf[cue];s.connect(sesCtx().destination);
+      const s=sesCtx().createBufferSource();s.buffer=sesBuf[cue];s.connect(sesCtx().destination);sesKaynak=s;
       const sure=(e>b?e-b:Math.max(0,s.buffer.duration-b));
       s.onended=son; setTimeout(son,(sure+1)*1000);   // yedek: onended gelmezse takılmasın
       if(e>b)s.start(0,b,e-b);else s.start(0,b);
@@ -242,8 +249,26 @@ function komutCal(cue,metin){   // cue = ses kimliği (kalkis/kisa/...); metin =
       try{const u=new SpeechSynthesisUtterance(metin||cue);u.lang='tr-TR';u.onend=son;u.onerror=son;speechSynthesis.speak(u);setTimeout(son,6000)}catch(e){son()}
     }
   };
+  if(tur==='komut')sesKuyruk=[];                    // henüz çalmamış eski komut/tarif beklemesin (süren ses kesilmez)
+  sesKuyruk.push({tur,f});
   sesSiradaki();
   return dosya?'dosya':'telefon sesi';
+}
+// Tarif (K59 eğitim seti, Tarif stili denemesi): komuttan sonra o hareketin tarifi. Ses kimlikleri program.json tarifler anahtarlarıdır;
+// dosyalar adlarının sonundan eşlenir (guven_hoca__tarif_ruku.mp3 → tarif_ruku). İlk seferde: her tarif bir namazda bir kez.
+const TARIF_ID=['tarif_tekbir','tarif_kiyam','tarif_ruku','tarif_itidal','tarif_secde','tarif_celse','tarif_kade','tarif_selam'];
+const TARIF_AD={tarif_tekbir:'Tarif: tekbir',tarif_kiyam:'Tarif: kıyam',tarif_ruku:'Tarif: rükû',tarif_itidal:'Tarif: doğrulma',tarif_secde:'Tarif: secde',tarif_celse:'Tarif: iki secde arası',tarif_kade:'Tarif: oturuş',tarif_selam:'Tarif: selam'};
+let tarifGoruldu=new Set(), tarifSon='';
+function tarifEkle(a){
+  const mod=$('selTarif').value; if(mod==='0')return;
+  if(a.i===1){tarifGoruldu.clear();tarifSon=''}      // planın ilk adımı = yeni namaz
+  const ids=a.adim==='kiyam'?(a.i===1?['tarif_tekbir','tarif_kiyam']:['tarif_kiyam']):['tarif_'+a.adim];
+  for(const id of ids){
+    if(mod==='1'&&tarifGoruldu.has(id))continue;
+    if(id===tarifSon)continue;                       // art arda aynı adım (sağ/sol selam): tarif bir kez
+    const k=komutCal(id,null,'tarif');
+    if(k!=='yok'){tarifGoruldu.add(id);tarifSon=id;log('tarif: '+(TARIF_AD[id]||id))}
+  }
 }
 function komutOlay(v){
   const kod=v.getUint8(17), arg=v.getUint8(18);
@@ -257,15 +282,17 @@ function komutOlay(v){
   if(kod===oncekiKod&&arg===oncekiArg)return;
   if(rk&&a){
     const yeniAdim=!(oncekiArg===arg&&(oncekiKod===0x10||oncekiKod===0x12));   // aynı adımda 0x10→0x12 yalnız yerleşme geçişidir
-    if(yeniAdim&&$('selSes').value==='1'){const k=komutCal(a.ses||a.cue,a.cue);log('komut '+(a.i||arg+1)+'/'+(a.n||hoca.adimlar.length)+': '+a.cue+' ('+k+')')}
+    if(yeniAdim&&$('selSes').value==='1'){const k=komutCal(a.ses||a.cue,a.cue);log('komut '+(a.i||arg+1)+'/'+(a.n||hoca.adimlar.length)+': '+a.cue+' ('+k+')');tarifEkle(a)}
     if(kod===0x12){log('yerleşti '+(a.i||arg+1)+'/'+(a.n||hoca.adimlar.length)+': '+a.cue);yerlestiOlay(arg,a)}
   }
-  else if(kod===0x11)log('rehber bitti');
+  else if(kod===0x11){log('rehber bitti');tarifGoruldu.clear()}
 }
 function yerlestiOlay(arg,a){}   // K48: öğrenci yerleşti; okuma kliplerinin kuyruğa girmesi buradan başlayacak (klip kuyruğu denemesi)
 async function sesToplu(files){   // birden çok dosyayı adlarına göre ses kimliklerine eşler (hoca_sabah.json: ses_dosya)
   const m=(hoca&&hoca.ses_dosya)||{};let n=0,yok=[];
-  for(const f of files){const ad=f.name.toLowerCase().replace(/\.[^.]+$/,'');const id=Object.keys(m).find(k=>m[k]===ad);
+  for(const f of files){const ad=f.name.toLowerCase().replace(/\.[^.]+$/,'').replace(/\s*\(\d+\)$/,'');
+    const tm=ad.match(/(?:^|__)(tarif_[a-z]+)$/);   // tarif dosyası: <persona>__tarif_x ya da tarif_x
+    const id=tm&&TARIF_ID.includes(tm[1])?tm[1]:Object.keys(m).find(k=>m[k]===ad);
     if(!id){yok.push(f.name);continue}
     try{await idbPut(id,f);await sesCoz(id,f);const s=$('sesDurum_'+id);if(s)s.textContent='dosya: '+f.name;n++}catch(e){yok.push(f.name+' ('+e+')')}}
   log('toplu yükleme: '+n+' ses yüklendi'+(yok.length?'; eşleşmeyen: '+yok.join(', '):''));
@@ -290,6 +317,17 @@ function sesArayuz(){
     dn.onclick=()=>{sesAc();log('deneme: '+cue+' ('+komutCal(cue,metinler[cue])+')')};
     inp.onchange=async()=>{const f=inp.files[0];if(!f)return;try{await idbPut(cue,f);await sesCoz(cue,f);st.textContent='dosya: '+f.name}catch(e){st.textContent='hata: '+e}};
     st.id='sesDurum_'+cue; row.append(lb,inp,kb,ks,dn,st); box.append(row);
+    if(typeof indexedDB!=='undefined')idbGet(cue).then(b=>{if(b)sesCoz(cue,b).then(()=>{st.textContent='dosya (kayıtlı)'}).catch(()=>{})}).catch(()=>{});
+  });
+  TARIF_ID.forEach(cue=>{                              // tarif satırları: dosya + Dene (kırpma yok)
+    const row=document.createElement('div'); row.className='file';
+    const lb=document.createElement('span'); lb.textContent=TARIF_AD[cue];
+    const inp=document.createElement('input'); inp.type='file'; inp.accept='audio/*,.mp3,.m4a,.ogg,.wav'; inp.style.flex='1 1 60%';
+    const dn=document.createElement('button'); dn.className='gray'; dn.textContent='Dene';
+    const st=document.createElement('small'); st.style.flex='1 1 100%'; st.textContent='dosya yok'; st.id='sesDurum_'+cue;
+    dn.onclick=()=>{sesAc();log('deneme: '+cue+' ('+komutCal(cue,null,'tarif')+')')};
+    inp.onchange=async()=>{const f=inp.files[0];if(!f)return;try{await idbPut(cue,f);await sesCoz(cue,f);st.textContent='dosya: '+f.name}catch(e){st.textContent='hata: '+e}};
+    row.append(lb,inp,dn,st); box.append(row);
     if(typeof indexedDB!=='undefined')idbGet(cue).then(b=>{if(b)sesCoz(cue,b).then(()=>{st.textContent='dosya (kayıtlı)'}).catch(()=>{})}).catch(()=>{});
   });
 }
