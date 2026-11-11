@@ -292,9 +292,10 @@ async function sesToplu(files){   // birden çok dosyayı adlarına göre ses ki
   const m=(hoca&&hoca.ses_dosya)||{};let n=0,yok=[];
   for(const f of files){const ad=f.name.toLowerCase().replace(/\.[^.]+$/,'').replace(/\s*\(\d+\)$/,'');
     const tm=ad.match(/(?:^|__)(tarif_[a-z]+)$/);   // tarif dosyası: <persona>__tarif_x ya da tarif_x
-    const id=tm&&TARIF_ID.includes(tm[1])?tm[1]:Object.keys(m).find(k=>m[k]===ad);
-    if(!id){yok.push(f.name);continue}
-    try{await idbPut(id,f);await sesCoz(id,f);const s=$('sesDurum_'+id);if(s)s.textContent='dosya: '+f.name;n++}catch(e){yok.push(f.name+' ('+e+')')}}
+    // Bir dosya birden çok komuta ait olabilir (kalkış tekbiri = kısa tekbir dosyası, 2026-11-11): hepsine atanır
+    const ids=tm&&TARIF_ID.includes(tm[1])?[tm[1]]:Object.keys(m).filter(k=>m[k]===ad);
+    if(!ids.length){yok.push(f.name);continue}
+    try{for(const id of ids){await idbPut(id,f);await sesCoz(id,f);const s=$('sesDurum_'+id);if(s)s.textContent='dosya: '+f.name}n++}catch(e){yok.push(f.name+' ('+e+')')}}
   log('toplu yükleme: '+n+' ses yüklendi'+(yok.length?'; eşleşmeyen: '+yok.join(', '):''));
 }
 function sesArayuz(){
