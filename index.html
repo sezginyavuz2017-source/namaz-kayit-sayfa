@@ -17,11 +17,13 @@
   .file>span{width:100%}
   .file select{flex:1 1 40%;min-width:0}
   .file button{flex:1 1 40%;margin:0}
+  input.tx{font-size:16px;padding:8px;background:#333;color:#eee;border:0;border-radius:6px;flex:1 1 50%;min-width:0}
+  .vk{display:flex;align-items:center;gap:6px;padding:3px 0}.vk span{flex:1}.vk b{width:52px;text-align:right}.vk small{width:34px;text-align:center;color:#aaa}.vk button{padding:6px 12px;margin:0;font-size:16px}
   canvas{display:block;background:#222;border-radius:8px;width:100%;max-width:340px;margin:8px auto 4px;touch-action:manipulation}
 </style>
 </head>
 <body>
-<h2>Namaz Kule Kayıt <small style="font-size:12px;color:#888">sürüm 2026-11-11c</small></h2>
+<h2>Namaz Kule Kayıt <small style="font-size:12px;color:#888">sürüm 2026-11-12a</small></h2>
 <div class="box">
   <button id="bConn">Kule'ye bağlan</button>
   <div class="row"><span>Bağlantı</span><b id="sConn">yok</b></div>
@@ -67,7 +69,20 @@
   <small>Kule hoca komutunu bildirince telefon çalar (hoparlör/kulaklık). Dosya yüklemezsen telefonun Türkçe sesi komutu okur. Tarif: tekbirden sonra o hareketin tarifi çalar (yalnız yüklenmiş tarif dosyası varsa; ör. guven_hoca__tarif_ruku.mp3). Tarif sürerken gelen tekbir, tarif bitince çalar: tekbiri duyunca hareket et (Kule hareketini bekler). Bağlanınca ekran açık kalır.</small>
   <div id="sesDosya"></div>
 </div>
+<div class="box">
+  <div class="row"><span>Namaz vakitleri</span><b id="vkKonum">ayarlanmadı</b></div>
+  <div class="row" style="gap:6px"><input id="vkAra" class="tx" placeholder="Şehir (ör. Miesbach)"><button id="bVkAra" class="gray" style="margin:0">Ara</button><button id="bVkGps" class="gray" style="margin:0">Konumum</button></div>
+  <div id="vkSonuc"></div>
+  <div id="vkTablo"></div>
+  <small id="vkNot" style="display:block;color:#aaa"></small>
+  <button id="bVkGonder" class="gray" disabled>Kule'ye gönder</button>
+  <div class="row"><span>Ezan (telefon)</span><select id="selEzan"><option value="1">Açık</option><option value="0">Kapalı</option></select></div>
+  <div class="file"><span>Ezan sesi (öğle, ikindi, akşam, yatsı) · sabah ezanı ayrı dosya</span>
+    <input type="file" id="fEzan" accept="audio/*" style="flex:1 1 60%"><button id="bEzanDene" class="gray">Dene</button><small id="stEzan" style="flex:1 1 100%">dosya yok</small>
+    <input type="file" id="fEzanSabah" accept="audio/*" style="flex:1 1 60%"><button id="bEzanDur" class="gray">Durdur</button><small id="stEzanSabah" style="flex:1 1 100%">sabah ezanı: dosya yok (sabah ezanı çalınmaz)</small></div>
+</div>
 <div id="log"></div>
+<script src="https://cdn.jsdelivr.net/npm/adhan@4.4.3/lib/bundles/adhan.umd.min.js"></script>
 <script>
 const SVC='4fa10001-e3a3-4101-b423-d62b3b4b9141';
 const C_STATUS='4fa10002-e3a3-4101-b423-d62b3b4b9141';
@@ -117,13 +132,14 @@ function enable(on){['bStart','bStop','bList','bDelAll'].forEach(i=>$(i).disable
 async function connect(){
   try{
     dev=await navigator.bluetooth.requestDevice({filters:[{services:[SVC]}],optionalServices:[SVC]});
-    dev.addEventListener('gattserverdisconnected',()=>{$('sConn').textContent='koptu';enable(false)});
+    dev.addEventListener('gattserverdisconnected',()=>{$('sConn').textContent='koptu';enable(false);$('bVkGonder').disabled=true});
     const s=await dev.gatt.connect(); const svc=await s.getPrimaryService(SVC);
     cs=await svc.getCharacteristic(C_STATUS); cset=await svc.getCharacteristic(C_SET); crec=await svc.getCharacteristic(C_REC);
     statusInit=false; cs.addEventListener('characteristicvaluechanged',onStatus); await cs.startNotifications();
     crec.addEventListener('characteristicvaluechanged',onRec); await crec.startNotifications();
     $('sConn').textContent='bağlı'; enable(true);
     await setTime(); log('saat gönderildi');
+    $('bVkGonder').disabled=false; await vakitGonder();
   }catch(e){log('bağlantı hatası: '+e);try{dev&&dev.gatt.connected&&dev.gatt.disconnect()}catch(_){}}
 }
 
@@ -442,6 +458,91 @@ $('rngDon').oninput=()=>{rad.a=+$('rngDon').value;$('lbDon').textContent=rad.a+'
 $('selRad').value=rad.m; $('selDon').value=rad.am; $('rngDon').value=rad.a; $('lbDon').textContent=rad.a+'°'; radSync(); radChanged();
 $('bConn').onclick=()=>{sesAc();komutIlk=true;connect()}; $('bStart').onclick=startRec; $('bStop').onclick=stopRec; $('bList').onclick=list;
 $('bDelAll').onclick=async()=>{if(confirm('Tüm kayıtlar silinsin mi?')){await wr([4]);setTimeout(list,400)}};
+
+// ---- Namaz vakitleri (K60): telefonda hesap (Diyanet yöntemi), kullanıcı ince ayarı, Kule'ye 30 günlük tablo ----
+// Hesap: adhan (Turkey = Diyanet: imsak 18°, yatsı 17°, temkin güneş −7 / öğle +5 / ikindi +4 / akşam +7 dk, ikindi asr-ı evvel).
+// Yuvarlama Diyanet tablosuna göre seçildi (İstanbul, 12–18 Kasım 2026: 42 vaktin 39'u aynı, 3'ü ±1 dk): imsak/güneş/öğle en yakın dk, ikindi/akşam/yatsı yukarı.
+// Bölge ve ince ayar bir kez yapılır, telefonda saklanır; Kule'ye her bağlanışta gönderilir. Vakit yöntemi fıkhî tercih: rules/ (dogrulandi:false).
+const VAKIT_AD=['İmsak','Güneş','Öğle','İkindi','Akşam','Yatsı'], VAKIT_TAVAN=[0,0,0,1,1,1], AYAR_MAX=5, AYAR_UYARI=2;
+function vAyar(){try{return JSON.parse(localStorage.getItem('vakitAyar')||'null')}catch(e){return null}}
+function vAyarKaydet(a){try{localStorage.setItem('vakitAyar',JSON.stringify(a))}catch(e){}}
+function tzOfs(tz,ms){   // dakika: yerel − UTC, o anda
+  const p=new Intl.DateTimeFormat('en-US',{timeZone:tz,hourCycle:'h23',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'}).formatToParts(new Date(ms));
+  const g=t=>+p.find(x=>x.type===t).value;
+  return Math.round((Date.UTC(g('year'),g('month')-1,g('day'),g('hour'),g('minute'),g('second'))-ms)/60000)}
+function yerelTarih(tz,ms){const p=new Intl.DateTimeFormat('en-US',{timeZone:tz,year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(ms));const g=t=>+p.find(x=>x.type===t).value;return {y:g('year'),m:g('month')-1,d:g('day')}}
+function gunBas(tz,y,m,d){const t=Date.UTC(y,m,d)-tzOfs(tz,Date.UTC(y,m,d,12))*60000; return Date.UTC(y,m,d)-tzOfs(tz,t)*60000}   // yerel 00:00 (UTC ms)
+function vakitGunu(a,y,m,d){
+  const p=adhan.CalculationMethod.Turkey(); p.rounding='none';
+  const pt=new adhan.PrayerTimes(new adhan.Coordinates(a.lat,a.lon),new Date(y,m,d,12),p);
+  const bas=gunBas(a.tz,y,m,d);
+  const dk=[pt.fajr,pt.sunrise,pt.dhuhr,pt.asr,pt.maghrib,pt.isha].map((t,i)=>{const r=(t.getTime()-bas)/60000;return (VAKIT_TAVAN[i]?Math.ceil(r-1e-6):Math.round(r))+((a.ayar&&a.ayar[i])||0)});
+  return {bas,ofs:tzOfs(a.tz,bas+12*3600000),dk}}
+// dünden başlar (gece yarısından sonra hâlâ yatsı vakti olduğu için), n gün ileri
+function vakitGunleri(a,n){const g0=yerelTarih(a.tz,Date.now()),o=[];for(let i=-1;i<n;i++){const t=new Date(Date.UTC(g0.y,g0.m,g0.d+i));o.push(vakitGunu(a,t.getUTCFullYear(),t.getUTCMonth(),t.getUTCDate()))}return o}
+const ss=x=>String(x).padStart(2,'0'), hhmm=dk=>ss(Math.floor(dk/60)%24)+':'+ss(dk%60);
+function asciiAd(t){const m={'ç':'c','Ç':'C','ğ':'g','Ğ':'G','ı':'i','İ':'I','ö':'o','Ö':'O','ş':'s','Ş':'S','ü':'u','Ü':'U','ä':'a','Ä':'A','ß':'ss','é':'e','â':'a','î':'i','û':'u'};return t.replace(/./g,c=>m[c]!==undefined?m[c]:c).replace(/[^\x20-\x7e]/g,'')}
+async function vakitGonder(){
+  const a=vAyar(); if(!a||!cset){if(!a)log("vakit: bölge seçilmedi, Kule'ye tablo gönderilmedi");return}
+  if(typeof adhan==='undefined'){log('vakit: hesap kütüphanesi yüklenemedi');return}
+  const gun=vakitGunleri(a,30), K=5;   // parça başına 5 gün = 88 bayt (MTU'ya sığar)
+  try{
+    for(let p=0;p*K<gun.length;p++){const k=gun.slice(p*K,p*K+K), b=new Uint8Array(3+17*k.length);b[0]=0x42;b[1]=1+17*k.length;b[2]=p;let o=3;
+      for(const g of k){const e=Math.floor(g.bas/1000);b[o++]=e&255;b[o++]=(e>>8)&255;b[o++]=(e>>16)&255;b[o++]=(e>>>24)&255;b[o++]=Math.round(g.ofs/15)&255;for(const x of g.dk){b[o++]=x&255;b[o++]=(x>>8)&255}}
+      await cset.writeValue(b)}
+    const ad=asciiAd(a.ad||'').slice(0,16); if(ad){const b=new Uint8Array(2+ad.length);b[0]=0x43;b[1]=ad.length;for(let i=0;i<ad.length;i++)b[2+i]=ad.charCodeAt(i);await cset.writeValue(b)}
+    log("vakit tablosu Kule'ye gönderildi: "+gun.length+' gün, '+(a.ad||''))
+  }catch(e){log('vakit gönderilemedi: '+e)}}
+function vakitCiz(){
+  const a=vAyar(); $('vkKonum').textContent=a?a.ad:'ayarlanmadı';
+  const box=$('vkTablo'); box.innerHTML=''; $('vkNot').textContent='';
+  if(!a)return;
+  if(typeof adhan==='undefined'){$('vkNot').textContent='hesap kütüphanesi yüklenemedi (internet?)';return}
+  if(!a.ayar)a.ayar=[0,0,0,0,0,0];
+  const bugun=vakitGunleri(a,1)[1];
+  VAKIT_AD.forEach((ad,i)=>{
+    const r=document.createElement('div');r.className='vk';
+    const n=document.createElement('span');n.textContent=ad;
+    const t=document.createElement('b');t.textContent=hhmm(bugun.dk[i]+Math.round(bugun.ofs-tzOfs(a.tz,bugun.bas)));   // gece yarısından geçen dk; yaz saati günü düzeltmesi
+    const eksi=document.createElement('button');eksi.className='gray';eksi.textContent='−';
+    const ay=document.createElement('small');ay.textContent=(a.ayar[i]>0?'+':'')+a.ayar[i];
+    const arti=document.createElement('button');arti.className='gray';arti.textContent='+';
+    const deg=d=>{const v=Math.max(-AYAR_MAX,Math.min(AYAR_MAX,a.ayar[i]+d));if(v===a.ayar[i])return;a.ayar[i]=v;vAyarKaydet(a);vakitCiz();if(cset&&dev&&dev.gatt.connected)enqueue(()=>vakitGonder())};
+    eksi.onclick=()=>deg(-1);arti.onclick=()=>deg(1);
+    r.append(n,t,eksi,ay,arti);box.append(r)});
+  const cok=a.ayar.some(x=>Math.abs(x)>AYAR_UYARI);
+  $('vkNot').innerHTML="Diyanet yöntemiyle hesaplanır; Diyanet'in tablosundan 1–2 dk fark olabilir. Her vakit ±"+AYAR_MAX+' dk ayarlanabilir.'+
+    (cok?'<br><b style="color:#fc6">Bir vakti '+AYAR_UYARI+" dakikadan fazla değiştirdin: bölgen için Diyanet'in (namazvakitleri.diyanet.gov.tr) ya da camiinin vakitleriyle karşılaştırmanı öneririz.</b>":'')}
+function vakitSec(ad,lat,lon,tz){const eski=vAyar();vAyarKaydet({ad,lat:+(+lat).toFixed(4),lon:+(+lon).toFixed(4),tz,ayar:(eski&&eski.ayar)||[0,0,0,0,0,0]});$('vkSonuc').innerHTML='';vakitCiz();if(cset&&dev&&dev.gatt.connected)enqueue(()=>vakitGonder());log('bölge: '+ad)}
+$('bVkAra').onclick=async()=>{
+  const q=$('vkAra').value.trim(); if(!q)return; const box=$('vkSonuc'); box.textContent='aranıyor…';
+  try{const r=await fetch('https://geocoding-api.open-meteo.com/v1/search?count=6&language=tr&format=json&name='+encodeURIComponent(q));const j=await r.json();
+    box.innerHTML=''; if(!j.results||!j.results.length){box.textContent='bulunamadı';return}
+    j.results.forEach(x=>{const b=document.createElement('button');b.className='gray';b.style.cssText='display:block;width:100%;text-align:left;font-size:15px';
+      b.textContent=x.name+(x.admin1?', '+x.admin1:'')+(x.country?' · '+x.country:'');b.onclick=()=>vakitSec(x.name,x.latitude,x.longitude,x.timezone||Intl.DateTimeFormat().resolvedOptions().timeZone);box.append(b)})
+  }catch(e){box.textContent='arama hatası: '+e}};
+$('bVkGps').onclick=()=>{if(!navigator.geolocation){log('konum desteklenmiyor');return}
+  navigator.geolocation.getCurrentPosition(p=>vakitSec('Konumum',p.coords.latitude,p.coords.longitude,Intl.DateTimeFormat().resolvedOptions().timeZone),e=>log('konum alınamadı: '+e.message),{enableHighAccuracy:false,timeout:15000})};
+$('bVkGonder').onclick=()=>enqueue(()=>vakitGonder());
+// ---- Ezan (telefon): vakit girince yüklenen ezan çalar (sayfa açık ve ekran açıkken; gerçek App'te bildirimle, K54) ----
+// Sabah ezanı farklıdır (es-salâtü hayrün mine'n-nevm): ayrı dosya yüklenmedikçe imsakta ezan çalınmaz. Güneşte ezan yok.
+let ezanCalan=null;
+function ezanCal(id){idbGet(id).then(b=>{if(!b){log('ezan dosyası yok');return}try{if(ezanCalan)ezanCalan.pause();ezanCalan=new Audio(URL.createObjectURL(b));ezanCalan.play().then(()=>log('ezan çalıyor')).catch(e=>log('ezan çalınamadı (önce sayfaya dokun): '+e))}catch(e){log('ezan: '+e)}}).catch(()=>{})}
+['fEzan','fEzanSabah'].forEach((f,k)=>{const id=k?'ezan_sabah':'ezan',st=k?'stEzanSabah':'stEzan',on=k?'sabah ezanı: ':'';
+  $(f).onchange=async()=>{const x=$(f).files[0];if(!x)return;try{await idbPut(id,x);$(st).textContent=on+'dosya: '+x.name}catch(e){$(st).textContent='hata: '+e}};
+  if(typeof indexedDB!=='undefined')idbGet(id).then(b=>{if(b)$(st).textContent=on+'dosya (kayıtlı)'}).catch(()=>{})});
+$('bEzanDene').onclick=()=>{sesAc();ezanCal('ezan')};
+$('bEzanDur').onclick=()=>{if(ezanCalan){ezanCalan.pause();ezanCalan=null;log('ezan durduruldu')}};
+try{$('selEzan').value=localStorage.getItem('ezanAcik')||'1'}catch(e){}
+$('selEzan').onchange=()=>{try{localStorage.setItem('ezanAcik',$('selEzan').value)}catch(e){}};
+setInterval(()=>{
+  const a=vAyar(); if(!a||typeof adhan==='undefined'||$('selEzan').value!=='1')return;
+  const now=Date.now(); let son=0; try{son=+localStorage.getItem('ezanSon')||0}catch(e){}
+  for(const g of vakitGunleri(a,1))for(const i of [0,2,3,4,5]){
+    const t=g.bas+g.dk[i]*60000;
+    if(now>=t&&now-t<90000&&t>son){try{localStorage.setItem('ezanSon',String(t))}catch(e){}log('vakit girdi: '+VAKIT_AD[i]);ezanCal(i===0?'ezan_sabah':'ezan');return}}
+},5000);
+vakitCiz();
 </script>
 </body>
 </html>
