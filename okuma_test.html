@@ -52,7 +52,7 @@ td,th{border-bottom:1px solid var(--line);padding:4px;text-align:left;vertical-a
 <body>
 <main>
 <h1>Okuma Testi</h1>
-<p class="sub">Whisper telefonda çalışır; ses dışarı gönderilmez. Sürüm 2026-11-13b</p>
+<p class="sub">Whisper telefonda çalışır; ses dışarı gönderilmez. Sürüm 2026-11-13c</p>
 
 <div class="card">
   <h2>1. Metin ve model</h2>
@@ -83,7 +83,7 @@ td,th{border-bottom:1px solid var(--line);padding:4px;text-align:left;vertical-a
     <span id="sure" class="mut">0,0 sn</span>
     <div class="meter"><i id="seviye"></i></div>
   </div>
-  <label><input type="checkbox" id="islem" checked> Telefonun ses işlemesi (gürültü bastırma, yankı giderme)</label>
+  <label><input type="checkbox" id="islem"> Telefonun ses işlemesi (gürültü bastırma, yankı giderme)</label>
   <div class="row" style="margin-top:8px">
     <label class="mut" style="margin:0">ya da ses dosyası seç:</label>
     <input type="file" id="dosya" accept="audio/*">
@@ -137,7 +137,7 @@ const METINLER = {
 // ---------- Modeller ----------
 const MODELLER = {
   quran: {ad:"Kur'an'a özel (Tarteel base, ~106 MB, yalnız Arapça)", id:'Mustanad/whisper-base-ar-quran-onnx', dtype:'q8', device:'wasm', dilYok:true, yalnizAr:true,
-          not:"Kur'an okuması üzerine eğitilmiş base model. Türkçe tanımaz."},
+          not:"Kur'an okuması üzerine eğitilmiş base model. Türkçe tanımaz. Besmeleyi yazmaz: Fâtiha'yı besmelesiz seç."},
   base: {ad:'Çok dilli base (~80 MB, hızlı)', id:'onnx-community/whisper-base', dtype:'q8', device:'wasm',
           not:'Arapça ve Türkçe; küçük, kalitesi sınırlı.'},
   small:{ad:'Çok dilli small (~250 MB, daha iyi, yavaş)', id:'onnx-community/whisper-small', dtype:'q8', device:'wasm',
@@ -328,6 +328,16 @@ $('btnTani').onclick=()=>{
 };
 
 const denemeler=[]; let hizEtiket='';
+// Seçili metin yanlış kalmışsa: duyulan, aynı dildeki başka bir metne belirgin biçimde daha çok benziyorsa söyle.
+function metinIpucu(s,H,eslesen){
+  let en=null,enS=eslesen;
+  for(const [k,m] of Object.entries(METINLER)){
+    if(k===s.k||m.dil!==s.dil||!m.metin) continue;
+    let n=0; for(const o of hizala(kelimeler(m.metin,m.dil),H)) if(o.t==='dogru'||o.t==='yakin') n+=o.r2!=null?2:1;
+    if(n>enS+2){ en=m; enS=n; }
+  }
+  return en?` · ⚠ Duyulan "${en.ad}" metnine daha çok benziyor; metin seçimini kontrol et.`:'';
+}
 function goster(s,mk,metin,ms,yukMs){
   const R=kelimeler(s.metin,s.dil), dt=donguTemizle(kelimeler(metin,s.dil)), H=dt.W, ops=hizala(R,H);
   const say={dogru:0,yakin:0,farkli:0,eksik:0,fazla:0}; const kutu=$('hizali'); kutu.innerHTML=''; kutu.className='ref'+(s.dil==='turkish'?' tr':'');
@@ -347,7 +357,8 @@ function goster(s,mk,metin,ms,yukMs){
   const top=R.length, puan=top?Math.round(100*(say.dogru+say.yakin)/top):0;
   $('puan').textContent=puan+'%';
   $('puanAyr').textContent=` ${say.dogru} doğru · ${say.yakin} yakın · ${say.farkli} farklı · ${say.eksik} eksik · ${say.fazla} fazla (toplam ${top} kelime)`
-    + (dt.atilan?` · ⚠ Whisper döngüye girdi, ${dt.atilan} tekrar kelime atıldı`:'');
+    + (dt.atilan?` · ⚠ Whisper döngüye girdi, ${dt.atilan} tekrar kelime atıldı`:'')
+    + metinIpucu(s,H,say.dogru+say.yakin);
   const h=$('ham'); h.className='hyp'+(s.dil==='turkish'?' tr':''); h.textContent=(dt.atilan?H.map(x=>x.g).join(' ')+'  [döngü temizlendi]':metin.trim())||'(boş)';
   $('sonuc').hidden=false;
   $('durum').textContent=`Tanıma ${(ms/1000).toFixed(1)} sn sürdü (${sesSn.toFixed(1)} sn ses, hız ×${(sesSn/(ms/1000)).toFixed(2)})`+(yukMs?`; model yükleme ${(yukMs/1000).toFixed(1)} sn`:'')+'.';
@@ -360,7 +371,7 @@ function goster(s,mk,metin,ms,yukMs){
 }
 $('btnKopya').onclick=async()=>{
   const ua=navigator.userAgent;
-  const t=['Okuma testi 2026-11-13b · '+ua].concat(denemeler.map(d=>
+  const t=['Okuma testi 2026-11-13c · '+ua].concat(denemeler.map(d=>
     `${d.saat} | ${d.metin} | ${d.model} | ${d.kaynak} ${d.sesSn.toFixed(1)} sn | işlem ${d.isSn.toFixed(1)} sn | ${d.puan}% doğru ${d.say.dogru} yakın ${d.say.yakin} farklı ${d.say.farkli} eksik ${d.say.eksik} fazla ${d.say.fazla} / ${d.top}\n  duyulan: ${d.duyulan}\n  farklar: ${d.fark.join(', ')||'-'}`)).join('\n');
   try{ await navigator.clipboard.writeText(t); $('kopyaNot').textContent='Kopyalandı.'; }catch(e){ $('kopyaNot').textContent='Kopyalanamadı.'; }
 };
