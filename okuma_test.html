@@ -52,7 +52,7 @@ td,th{border-bottom:1px solid var(--line);padding:4px;text-align:left;vertical-a
 <body>
 <main>
 <h1>Okuma Testi</h1>
-<p class="sub">Whisper telefonda çalışır; ses dışarı gönderilmez. Sürüm 2026-11-13a</p>
+<p class="sub">Whisper telefonda çalışır; ses dışarı gönderilmez. Sürüm 2026-11-13b</p>
 
 <div class="card">
   <h2>1. Metin ve model</h2>
@@ -67,6 +67,8 @@ td,th{border-bottom:1px solid var(--line);padding:4px;text-align:left;vertical-a
   <label for="model">Model</label>
   <select id="model"></select>
   <p class="mut" id="modelNot"></p>
+  <label><input type="checkbox" id="gpu"> Ekran kartıyla hızlandır (WebGPU; yalnız çok dilli modeller)</label>
+  <p class="mut" id="hizNot"></p>
 </div>
 
 <div class="card">
@@ -159,12 +161,25 @@ function refGuncelle(){
   $('serbestKutu').hidden = s.k!=='serbest';
   const r=$('refGoster'); r.className='ref'+(s.dil==='turkish'?' tr':''); r.textContent=s.metin||'—';
   const md=MODELLER[$('model').value];
+  $('gpu').disabled = md.yalnizAr || md.device==='webgpu' || !navigator.gpu;
   let not=md.not; if (md.yalnizAr && s.dil==='turkish') not+=' ⚠ Bu metin Türkçe; çok dilli bir model seç.';
   $('modelNot').textContent=not; ayarKaydet();
 }
 ['metin','model','serbestDil'].forEach(id=>$(id).addEventListener('change',refGuncelle));
 $('serbestMetin').addEventListener('input',refGuncelle);
 refGuncelle();
+$('hizNot').textContent = (self.crossOriginIsolated ? 'Çok çekirdek: açık' : 'Çok çekirdek: kapalı (sayfayı bir kez yenile)')
+  + ' · ' + (navigator.gpu ? 'WebGPU var' : 'WebGPU yok');
+// Çok çekirdekli WASM için sayfa "cross-origin isolated" olmalı; GitHub Pages başlık koyamadığı için
+// yalnız bu sayfanın yanıtına başlık ekleyen küçük bir service worker kullanılır (coi_sw.js). İlk açılışta bir kez yenilenir.
+if ('serviceWorker' in navigator && !self.crossOriginIsolated && location.protocol==='https:') {
+  navigator.serviceWorker.register('coi_sw.js').then(r=>{
+    if (sessionStorage.getItem('coiYenilendi')) return;
+    const yenile=()=>{ sessionStorage.setItem('coiYenilendi','1'); location.reload(); };
+    if (r.active && navigator.serviceWorker.controller) yenile();
+    else navigator.serviceWorker.addEventListener('controllerchange', yenile, {once:true});
+  }).catch(()=>{});
+}
 
 // ---------- Normalleştirme ve hizalama ----------
 function normAr(w){
@@ -200,6 +215,21 @@ function hizala(R,H){
   }
   const ops=[]; let i=m,j=n; while(i||j){ const b=bk[i][j]; ops.push(b.op); i=b.i; j=b.j; } ops.reverse();
   return ops;
+}
+// Whisper döngüsü: 1–6 kelimelik bir grup art arda 3+ kez tekrarlanırsa tek kopyası bırakılır.
+// (Fâtiha/İhlâs'ta meşru art arda üçlü tekrar yok; "الرحمن الرحيم" iki kez ama ayrı yerlerde.)
+function donguTemizle(W){
+  const out=[]; let atilan=0;
+  for(let i=0;i<W.length;){
+    let bulundu=false;
+    for(let n=1;n<=6 && !bulundu;n++){
+      if(i+3*n>W.length) break;
+      let k=1; while(i+(k+1)*n<=W.length && W.slice(i+k*n,i+(k+1)*n).every((w,x)=>w.n===W[i+x].n)) k++;
+      if(k>=3){ for(let x=0;x<n;x++) out.push(W[i+x]); atilan+=(k-1)*n; i+=k*n; bulundu=true; }
+    }
+    if(!bulundu){ out.push(W[i]); i++; }
+  }
+  return {W:out, atilan};
 }
 
 // ---------- Kayıt ----------
@@ -258,7 +288,7 @@ self.onmessage = async (e) => {
         progress_callback: (p) => self.postMessage({ type: 'progress', p: { status: p.status, file: p.file, progress: p.progress, loaded: p.loaded, total: p.total } }) });
       anahtar = k; self.postMessage({ type: 'yuklendi', ms: performance.now() - t0 });
     }
-    const o = { chunk_length_s: 30, stride_length_s: 5 };
+    const o = { chunk_length_s: 30, stride_length_s: 5, max_new_tokens: m.maxTok };
     if (m.language) { o.language = m.language; o.task = 'transcribe'; }
     const t1 = performance.now();
     const out = await boru(m.audio, o);
@@ -274,7 +304,8 @@ $('btnTani').onclick=()=>{
   if(!ses16){ return; }
   if(!s.metin){ $('durum').textContent='Önce metni yaz.'; return; }
   if(md.yalnizAr && s.dil==='turkish'){ $('durum').textContent="Kur'an modeli Türkçe tanımaz; çok dilli bir model seç."; return; }
-  if(md.device==='webgpu' && !navigator.gpu){ $('durum').textContent='Bu tarayıcıda WebGPU yok; başka model seç.'; return; }
+  const gpu = md.device==='webgpu' || (!md.yalnizAr && $('gpu').checked && !!navigator.gpu);
+  if(gpu && !navigator.gpu){ $('durum').textContent='Bu tarayıcıda WebGPU yok; başka model seç.'; return; }
   $('btnTani').disabled=true; $('sonuc').hidden=true; $('durum').textContent='Model hazırlanıyor…';
   for(const k in dosyaIlerleme) delete dosyaIlerleme[k];
   const w=isciAl(); let yukMs=0;
@@ -289,12 +320,16 @@ $('btnTani').onclick=()=>{
     else if(m.type==='hata'){ $('btnTani').disabled=false; $('durum').textContent='Hata: '+m.msg; }
   };
   $('durum').textContent='Tanınıyor… ('+sesSn.toFixed(0)+' sn ses)';
-  w.postMessage({id:md.id,dtype:md.dtype,device:md.device,language:md.dilYok?null:s.dil,audio:ses16});
+  // Döngüye karşı üst sınır: parça (≤30 sn) başına saniyede ~10 belirteç (gerçek okuma ~4/sn).
+  const maxTok = Math.min(400, Math.ceil(Math.min(sesSn,30)*10)+24);
+  const dtype = gpu && md.device!=='webgpu' ? {encoder_model:'fp32',decoder_model_merged:'q4'} : md.dtype;
+  hizEtiket = (gpu?'webgpu':'wasm')+(self.crossOriginIsolated&&!gpu?' çok çekirdek':'');
+  w.postMessage({id:md.id,dtype,device:gpu?'webgpu':'wasm',language:md.dilYok?null:s.dil,audio:ses16,maxTok});
 };
 
-const denemeler=[];
+const denemeler=[]; let hizEtiket='';
 function goster(s,mk,metin,ms,yukMs){
-  const R=kelimeler(s.metin,s.dil), H=kelimeler(metin,s.dil), ops=hizala(R,H);
+  const R=kelimeler(s.metin,s.dil), dt=donguTemizle(kelimeler(metin,s.dil)), H=dt.W, ops=hizala(R,H);
   const say={dogru:0,yakin:0,farkli:0,eksik:0,fazla:0}; const kutu=$('hizali'); kutu.innerHTML=''; kutu.className='ref'+(s.dil==='turkish'?' tr':'');
   const el=(t,ust,alt)=>{ const sp=document.createElement('span'); sp.className='w '+t; sp.textContent=ust; if(alt){const sm=document.createElement('small'); sm.textContent=alt; sp.appendChild(sm);} kutu.appendChild(sp); };
   const fark=[];
@@ -311,11 +346,13 @@ function goster(s,mk,metin,ms,yukMs){
   }
   const top=R.length, puan=top?Math.round(100*(say.dogru+say.yakin)/top):0;
   $('puan').textContent=puan+'%';
-  $('puanAyr').textContent=` ${say.dogru} doğru · ${say.yakin} yakın · ${say.farkli} farklı · ${say.eksik} eksik · ${say.fazla} fazla (toplam ${top} kelime)`;
-  const h=$('ham'); h.className='hyp'+(s.dil==='turkish'?' tr':''); h.textContent=metin.trim()||'(boş)';
+  $('puanAyr').textContent=` ${say.dogru} doğru · ${say.yakin} yakın · ${say.farkli} farklı · ${say.eksik} eksik · ${say.fazla} fazla (toplam ${top} kelime)`
+    + (dt.atilan?` · ⚠ Whisper döngüye girdi, ${dt.atilan} tekrar kelime atıldı`:'');
+  const h=$('ham'); h.className='hyp'+(s.dil==='turkish'?' tr':''); h.textContent=(dt.atilan?H.map(x=>x.g).join(' ')+'  [döngü temizlendi]':metin.trim())||'(boş)';
   $('sonuc').hidden=false;
   $('durum').textContent=`Tanıma ${(ms/1000).toFixed(1)} sn sürdü (${sesSn.toFixed(1)} sn ses, hız ×${(sesSn/(ms/1000)).toFixed(2)})`+(yukMs?`; model yükleme ${(yukMs/1000).toFixed(1)} sn`:'')+'.';
-  const d={saat:new Date().toLocaleTimeString('tr-TR'),metin:s.ad,model:mk,kaynak:sesKaynak,sesSn,isSn:ms/1000,puan,say,top,duyulan:metin.trim(),fark};
+  const d={saat:new Date().toLocaleTimeString('tr-TR'),metin:s.ad,model:mk+' '+hizEtiket,kaynak:sesKaynak,sesSn,isSn:ms/1000,puan,say,top,
+           duyulan:H.map(x=>x.g).join(' ')+(dt.atilan?` [döngü: ${dt.atilan} kelime atıldı]`:''),fark};
   denemeler.push(d);
   const tr=document.createElement('tr');
   [d.saat,d.metin,d.model,d.kaynak+' · '+d.sesSn.toFixed(1)+' sn',d.isSn.toFixed(1)+' sn',`${puan}% (${say.dogru}+${say.yakin}/${top}, eksik ${say.eksik}, fazla ${say.fazla})`].forEach(x=>{const td=document.createElement('td');td.textContent=x;tr.appendChild(td);});
@@ -323,7 +360,7 @@ function goster(s,mk,metin,ms,yukMs){
 }
 $('btnKopya').onclick=async()=>{
   const ua=navigator.userAgent;
-  const t=['Okuma testi 2026-11-13a · '+ua].concat(denemeler.map(d=>
+  const t=['Okuma testi 2026-11-13b · '+ua].concat(denemeler.map(d=>
     `${d.saat} | ${d.metin} | ${d.model} | ${d.kaynak} ${d.sesSn.toFixed(1)} sn | işlem ${d.isSn.toFixed(1)} sn | ${d.puan}% doğru ${d.say.dogru} yakın ${d.say.yakin} farklı ${d.say.farkli} eksik ${d.say.eksik} fazla ${d.say.fazla} / ${d.top}\n  duyulan: ${d.duyulan}\n  farklar: ${d.fark.join(', ')||'-'}`)).join('\n');
   try{ await navigator.clipboard.writeText(t); $('kopyaNot').textContent='Kopyalandı.'; }catch(e){ $('kopyaNot').textContent='Kopyalanamadı.'; }
 };
