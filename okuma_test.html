@@ -52,7 +52,7 @@ td,th{border-bottom:1px solid var(--line);padding:4px;text-align:left;vertical-a
 <body>
 <main>
 <h1>Okuma Testi</h1>
-<p class="sub">Whisper telefonda çalışır; ses dışarı gönderilmez. Sürüm 2026-11-13c</p>
+<p class="sub">Whisper telefonda çalışır; ses dışarı gönderilmez. Sürüm 2026-11-13d</p>
 
 <div class="card">
   <h2>1. Metin ve model</h2>
@@ -84,6 +84,11 @@ td,th{border-bottom:1px solid var(--line);padding:4px;text-align:left;vertical-a
     <div class="meter"><i id="seviye"></i></div>
   </div>
   <label><input type="checkbox" id="islem"> Telefonun ses işlemesi (gürültü bastırma, yankı giderme)</label>
+  <div class="row" style="margin-top:8px">
+    <button id="btnKule">Kule'ye bağlan</button>
+    <button id="btnKuleKayit" class="rec" disabled>● Kule mikrofonuyla kaydet</button>
+    <span id="kuleDurum" class="mut">Kule mikrofonu: bağlı değil</span>
+  </div>
   <div class="row" style="margin-top:8px">
     <label class="mut" style="margin:0">ya da ses dosyası seç:</label>
     <input type="file" id="dosya" accept="audio/*">
@@ -258,6 +263,69 @@ $('btnKayit').onclick=async()=>{
 };
 $('dosya').onchange=e=>{ const f=e.target.files[0]; if(f) sesAl(f,'dosya: '+f.name); };
 
+// ---------- Kule mikrofonu (K62: BLE Char 2, 16 kHz IMA-ADPCM; protokol.md §2.3) ----------
+const KULE_SVC='4fa10001-e3a3-4101-b423-d62b3b4b9141', KULE_SES='4fa10003-e3a3-4101-b423-d62b3b4b9141', KULE_AYAR='4fa10004-e3a3-4101-b423-d62b3b4b9141';
+const AD_IDX=[-1,-1,-1,-1,2,4,6,8,-1,-1,-1,-1,2,4,6,8];
+const AD_STEP=[7,8,9,10,11,12,13,14,16,17,19,21,23,25,28,31,34,37,41,45,50,55,60,66,73,80,88,97,107,118,130,143,157,173,190,209,230,253,279,307,337,371,408,449,494,544,598,658,724,796,876,963,1060,1166,1282,1411,1552,1707,1878,2066,2272,2499,2749,3024,3327,3660,4026,4428,4871,5358,5894,6484,7132,7845,8630,9493,10442,11487,12635,13899,15289,16818,18500,20350,22385,24623,27086,29794,32767];
+let kuleSes=null, kuleAyar=null, kuleParca=[], kuleBekSeq=-1, kuleSonN=476, kuleKayip=0, kulePaket=0, kuleT0=0, kuleZam=null, kuleKayitta=false;
+function adpcmCoz(dv){
+  let pred=dv.getInt16(3,true), idx=dv.getUint8(5); const n=dv.byteLength-6, out=new Int16Array(n*2);
+  for(let i=0;i<n;i++){ const b=dv.getUint8(6+i);
+    for(let h=0;h<2;h++){ const code=h?(b>>4):(b&15), step=AD_STEP[idx]; let diff=step>>3;
+      if(code&4) diff+=step; if(code&2) diff+=step>>1; if(code&1) diff+=step>>2;
+      pred=(code&8)?pred-diff:pred+diff; if(pred>32767) pred=32767; else if(pred<-32768) pred=-32768;
+      idx+=AD_IDX[code]; if(idx<0) idx=0; else if(idx>88) idx=88; out[2*i+h]=pred; } }
+  return out;
+}
+function kuleBildirim(e){
+  if(!kuleKayitta) return;
+  const dv=e.target.value; if(dv.byteLength<7||dv.getUint8(2)!==2) return;
+  const seq=dv.getUint16(0,true);
+  if(kuleBekSeq>=0 && seq!==kuleBekSeq){ const k=(seq-kuleBekSeq+65536)%65536; if(k<200){ kuleKayip+=k; kuleParca.push(new Int16Array(k*kuleSonN)); } }
+  const s=adpcmCoz(dv); kuleSonN=s.length; kuleParca.push(s); kuleBekSeq=(seq+1)%65536; kulePaket++;
+  let tepe=0; for(let i=0;i<s.length;i+=4){ const a=Math.abs(s[i]); if(a>tepe) tepe=a; }
+  $('seviye').style.width=Math.min(100,Math.max(0,(20*Math.log10(tepe/32768+1e-9)+60)*100/60))+'%';
+}
+async function kuleYaz(acik){ await kuleAyar.writeValueWithResponse(new Uint8Array([0x20,1,acik?1:0])); }
+$('btnKule').onclick=async()=>{
+  try{
+    if(!navigator.bluetooth){ $('kuleDurum').textContent='Bu tarayıcıda Web Bluetooth yok (Android/masaüstü Chrome gerekir).'; return; }
+    const dev=await navigator.bluetooth.requestDevice({filters:[{services:[KULE_SVC]}]});
+    $('kuleDurum').textContent='Bağlanıyor…';
+    const gatt=await dev.gatt.connect(), svc=await gatt.getPrimaryService(KULE_SVC);
+    kuleSes=await svc.getCharacteristic(KULE_SES); kuleAyar=await svc.getCharacteristic(KULE_AYAR);
+    kuleSes.addEventListener('characteristicvaluechanged',kuleBildirim); await kuleSes.startNotifications();
+    dev.addEventListener('gattserverdisconnected',()=>{ $('kuleDurum').textContent='Kule bağlantısı koptu.'; $('btnKuleKayit').disabled=true; if(kuleKayitta) kuleBitir(); });
+    $('kuleDurum').textContent='Kule bağlı ('+(dev.name||'Kule')+')'; $('btnKuleKayit').disabled=false;
+  }catch(e){ $('kuleDurum').textContent='Bağlanamadı: '+e.message; }
+};
+function wavBlob(i16){
+  const b=new ArrayBuffer(44+i16.length*2), v=new DataView(b), w=(o,s)=>{for(let i=0;i<s.length;i++) v.setUint8(o+i,s.charCodeAt(i));};
+  w(0,'RIFF'); v.setUint32(4,36+i16.length*2,true); w(8,'WAVE'); w(12,'fmt '); v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,1,true);
+  v.setUint32(24,16000,true); v.setUint32(28,32000,true); v.setUint16(32,2,true); v.setUint16(34,16,true); w(36,'data'); v.setUint32(40,i16.length*2,true);
+  new Int16Array(b,44).set(i16); return new Blob([b],{type:'audio/wav'});
+}
+async function kuleBitir(){
+  kuleKayitta=false; clearInterval(kuleZam); $('seviye').style.width='0'; $('btnKuleKayit').textContent='● Kule mikrofonuyla kaydet';
+  try{ await kuleYaz(false); }catch(e){}
+  let n=0; for(const p of kuleParca) n+=p.length; const i16=new Int16Array(n); let o=0; for(const p of kuleParca){ i16.set(p,o); o+=p.length; }
+  if(!n){ $('durum').textContent='Kule\'den ses gelmedi.'; return; }
+  // Kule mikrofonunun seviyesi düşük olabilir: tepe −1 dBFS'e getirilir (yalnız Kule kaynağı; telefon kendi kazancını ayarlıyor)
+  let tepe=1; for(let i=0;i<n;i++){ const a=Math.abs(i16[i]); if(a>tepe) tepe=a; }
+  const k=Math.min(16, 29000/tepe); for(let i=0;i<n;i++) i16[i]=Math.max(-32768,Math.min(32767,Math.round(i16[i]*k)));
+  const kayipYuzde=kulePaket?Math.round(100*kuleKayip/(kulePaket+kuleKayip)):0;
+  $('kuleDurum').textContent=`Kule bağlı · son kayıt: ${kulePaket} paket, kayıp ${kuleKayip} (%${kayipYuzde}), kazanç ×${k.toFixed(1)}`;
+  await sesAl(wavBlob(i16),'Kule mikrofonu'+(kuleKayip?` (kayıp %${kayipYuzde})`:''));
+  $('indir').hidden=false; $('indir').download=$('indir').download.replace(/\.(webm|m4a)$/,'.wav');
+}
+$('btnKuleKayit').onclick=async()=>{
+  if(kuleKayitta){ await kuleBitir(); return; }
+  kuleParca=[]; kuleBekSeq=-1; kuleKayip=0; kulePaket=0;
+  try{ await kuleYaz(true); }catch(e){ $('kuleDurum').textContent='Kule\'ye yazılamadı: '+e.message; return; }
+  kuleKayitta=true; kuleT0=performance.now(); $('btnKuleKayit').textContent='■ Kule kaydını bitir'; $('btnTani').disabled=true;
+  kuleZam=setInterval(()=>{ $('sure').textContent=((performance.now()-kuleT0)/1000).toFixed(1).replace('.',',')+' sn'; },100);
+};
+
 async function sesAl(blob,kaynak){
   sesBlob=blob; sesKaynak=kaynak;
   const url=URL.createObjectURL(blob); $('dinle').src=url; $('dinle').hidden=false;
@@ -371,7 +439,7 @@ function goster(s,mk,metin,ms,yukMs){
 }
 $('btnKopya').onclick=async()=>{
   const ua=navigator.userAgent;
-  const t=['Okuma testi 2026-11-13c · '+ua].concat(denemeler.map(d=>
+  const t=['Okuma testi 2026-11-13d · '+ua].concat(denemeler.map(d=>
     `${d.saat} | ${d.metin} | ${d.model} | ${d.kaynak} ${d.sesSn.toFixed(1)} sn | işlem ${d.isSn.toFixed(1)} sn | ${d.puan}% doğru ${d.say.dogru} yakın ${d.say.yakin} farklı ${d.say.farkli} eksik ${d.say.eksik} fazla ${d.say.fazla} / ${d.top}\n  duyulan: ${d.duyulan}\n  farklar: ${d.fark.join(', ')||'-'}`)).join('\n');
   try{ await navigator.clipboard.writeText(t); $('kopyaNot').textContent='Kopyalandı.'; }catch(e){ $('kopyaNot').textContent='Kopyalanamadı.'; }
 };
