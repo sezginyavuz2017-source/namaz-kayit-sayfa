@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Okuma Testi</title>
+<!--
+  Okuma testi (K55/K56 denemesi): telefon mikrofonu -> tarayıcıda çevrimdışı Whisper -> kelime düzeyinde karşılaştırma.
+  Ses cihazdan dışarı gönderilmez (K3); yalnız model dosyaları ilk kullanımda Hugging Face'ten bir kez indirilir ve tarayıcı önbelleğinde kalır.
+  Okuyuş/telaffuz/tecvid değerlendirilmez (K55). Kaynak: app/okuma_test/index.html (proje deposu), yayın: namaz-kayit-sayfa/okuma_test.html.
+  Referans metinler: Hafs rivayeti, Tanzil "simple" yazımı; test aracıdır, ehil doğrulaması yok.
+-->
+<style>
+:root{--bg:#f6f5f1;--fg:#1d1d1b;--mut:#6b6a64;--card:#fff;--line:#dedbd2;--acc:#1f6f5c;--ok:#1e8a4c;--okb:#e2f4e8;--near:#9a6b00;--nearb:#fbf0d3;--bad:#b4471b;--badb:#fbe3d8;--miss:#a3262a;--missb:#f7dcdc}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#151614;--fg:#ecebe6;--mut:#9c9a92;--card:#1f201d;--line:#34352f;--acc:#5cc2a4;--ok:#6fd497;--okb:#173524;--near:#e6b84d;--nearb:#3a2f12;--bad:#f08a5d;--badb:#3d2318;--miss:#f0787c;--missb:#3d1a1c}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:760px;margin:0 auto;padding:16px}
+h1{font-size:1.35rem;margin:.2rem 0 .1rem}
+.sub{color:var(--mut);font-size:.9rem;margin:0 0 1rem}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin:0 0 12px}
+.card h2{font-size:1rem;margin:0 0 .6rem}
+label{display:block;font-size:.85rem;color:var(--mut);margin:.5rem 0 .2rem}
+select,textarea,input[type=text]{width:100%;font:inherit;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+button{font:inherit;border:1px solid var(--line);background:var(--bg);color:var(--fg);border-radius:10px;padding:10px 14px;cursor:pointer}
+button.pri{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:600}
+button.rec{background:var(--miss);border-color:var(--miss);color:#fff;font-weight:600}
+button:disabled{opacity:.45;cursor:default}
+.ref{font-size:1.5rem;line-height:2.2;direction:rtl;text-align:right;font-family:"Amiri","Scheherazade New","Noto Naskh Arabic","Traditional Arabic",serif}
+.ref.tr{direction:ltr;text-align:left;font-size:1.1rem;line-height:1.6;font-family:inherit}
+.meter{height:10px;background:var(--line);border-radius:6px;overflow:hidden;flex:1;min-width:120px}
+.meter i{display:block;height:100%;width:0;background:var(--acc);transition:width .08s}
+.mut{color:var(--mut);font-size:.85rem}
+.prog{font-size:.85rem;color:var(--mut);white-space:pre-line}
+.w{display:inline-block;padding:0 6px;margin:2px;border-radius:6px}
+.w small{display:block;font-size:.7rem;line-height:1.2;font-family:system-ui,sans-serif;direction:ltr;text-align:center}
+.w.dogru{background:var(--okb);color:var(--ok)}
+.w.yakin{background:var(--nearb);color:var(--near)}
+.w.farkli{background:var(--badb);color:var(--bad)}
+.w.eksik{background:var(--missb);color:var(--miss);text-decoration:line-through}
+.w.fazla{border:1px dashed var(--mut);color:var(--mut)}
+.score{font-size:1.6rem;font-weight:700}
+.legend span{margin-right:10px;font-size:.8rem}
+table{width:100%;border-collapse:collapse;font-size:.8rem}
+td,th{border-bottom:1px solid var(--line);padding:4px;text-align:left;vertical-align:top}
+.hyp{direction:rtl;text-align:right;font-size:1.15rem}
+.hyp.tr{direction:ltr;text-align:left}
+.note{font-size:.85rem;background:var(--bg);border-left:3px solid var(--acc);padding:8px 10px;border-radius:4px}
+</style>
+</head>
+<body>
+<main>
+<h1>Okuma Testi</h1>
+<p class="sub">Whisper telefonda çalışır; ses dışarı gönderilmez. Sürüm 2026-11-13a</p>
+
+<div class="card">
+  <h2>1. Metin ve model</h2>
+  <label for="metin">Okunacak metin</label>
+  <select id="metin"></select>
+  <div id="serbestKutu" hidden>
+    <label for="serbestDil">Dil</label>
+    <select id="serbestDil"><option value="turkish">Türkçe</option><option value="arabic">Arapça</option></select>
+    <label for="serbestMetin">Metin</label>
+    <textarea id="serbestMetin" rows="2" placeholder="Okuyacağın cümleyi yaz"></textarea>
+  </div>
+  <label for="model">Model</label>
+  <select id="model"></select>
+  <p class="mut" id="modelNot"></p>
+</div>
+
+<div class="card">
+  <h2>2. Okunacak metin</h2>
+  <div id="refGoster" class="ref"></div>
+</div>
+
+<div class="card">
+  <h2>3. Kayıt</h2>
+  <div class="row">
+    <button id="btnKayit" class="rec">● Kaydı başlat</button>
+    <span id="sure" class="mut">0,0 sn</span>
+    <div class="meter"><i id="seviye"></i></div>
+  </div>
+  <label><input type="checkbox" id="islem" checked> Telefonun ses işlemesi (gürültü bastırma, yankı giderme)</label>
+  <div class="row" style="margin-top:8px">
+    <label class="mut" style="margin:0">ya da ses dosyası seç:</label>
+    <input type="file" id="dosya" accept="audio/*">
+  </div>
+  <div class="row" style="margin-top:8px">
+    <audio id="dinle" controls hidden></audio>
+    <a id="indir" hidden download>Kaydı indir</a>
+  </div>
+</div>
+
+<div class="card">
+  <h2>4. Tanı ve karşılaştır</h2>
+  <div class="row">
+    <button id="btnTani" class="pri" disabled>Tanı</button>
+    <span class="mut">Aynı kaydı başka modelle de deneyebilirsin.</span>
+  </div>
+  <p class="prog" id="durum"></p>
+  <div id="sonuc" hidden>
+    <div class="row"><span class="score" id="puan"></span><span class="mut" id="puanAyr"></span></div>
+    <p class="legend"><span class="w dogru">doğru</span><span class="w yakin">yakın</span><span class="w farkli">farklı</span><span class="w eksik">eksik</span><span class="w fazla">fazla</span></p>
+    <div id="hizali" class="ref"></div>
+    <label>Whisper'ın duyduğu</label>
+    <div id="ham" class="hyp"></div>
+  </div>
+  <p class="note">Yalnızca kelimelere bakılır. Okuyuş, telaffuz ve tecvid değerlendirilmez; bunları bir hocaya dinletmek gerekir.</p>
+</div>
+
+<div class="card">
+  <h2>Denemeler</h2>
+  <table><thead><tr><th>Saat</th><th>Metin</th><th>Model</th><th>Ses</th><th>İşlem</th><th>Sonuç</th></tr></thead><tbody id="gecmis"></tbody></table>
+  <div class="row" style="margin-top:8px"><button id="btnKopya">Sonuçları kopyala</button><span id="kopyaNot" class="mut"></span></div>
+</div>
+</main>
+
+<script>
+'use strict';
+// ---------- Referans metinler (Hafs, Tanzil simple yazımı; test aracı) ----------
+const METINLER = {
+  fatiha_b: {ad:'Fâtiha (besmele ile)', dil:'arabic', metin:
+    'بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ ۝ الْحَمْدُ لِلَّهِ رَبِّ الْعَالَمِينَ ۝ الرَّحْمَٰنِ الرَّحِيمِ ۝ مَالِكِ يَوْمِ الدِّينِ ۝ إِيَّاكَ نَعْبُدُ وَإِيَّاكَ نَسْتَعِينُ ۝ اهْدِنَا الصِّرَاطَ الْمُسْتَقِيمَ ۝ صِرَاطَ الَّذِينَ أَنْعَمْتَ عَلَيْهِمْ غَيْرِ الْمَغْضُوبِ عَلَيْهِمْ وَلَا الضَّالِّينَ'},
+  fatiha: {ad:'Fâtiha (besmelesiz)', dil:'arabic', metin:
+    'الْحَمْدُ لِلَّهِ رَبِّ الْعَالَمِينَ ۝ الرَّحْمَٰنِ الرَّحِيمِ ۝ مَالِكِ يَوْمِ الدِّينِ ۝ إِيَّاكَ نَعْبُدُ وَإِيَّاكَ نَسْتَعِينُ ۝ اهْدِنَا الصِّرَاطَ الْمُسْتَقِيمَ ۝ صِرَاطَ الَّذِينَ أَنْعَمْتَ عَلَيْهِمْ غَيْرِ الْمَغْضُوبِ عَلَيْهِمْ وَلَا الضَّالِّينَ'},
+  ihlas: {ad:'İhlâs', dil:'arabic', metin:
+    'قُلْ هُوَ اللَّهُ أَحَدٌ ۝ اللَّهُ الصَّمَدُ ۝ لَمْ يَلِدْ وَلَمْ يُولَدْ ۝ وَلَمْ يَكُن لَّهُ كُفُوًا أَحَدٌ'},
+  tr_evet: {ad:'Türkçe: "Evet, ayaktayım"', dil:'turkish', metin:'Evet, ayaktayım.'},
+  tr_hayir: {ad:'Türkçe: "Hayır, oturuyorum"', dil:'turkish', metin:'Hayır, oturuyorum.'},
+  tr_kac: {ad:'Türkçe: "Üçüncü rekattayım"', dil:'turkish', metin:'Üçüncü rekattayım.'},
+  tr_tekrar: {ad:'Türkçe: "Bir daha birlikte okuyalım"', dil:'turkish', metin:'Bir daha birlikte okuyalım.'},
+  serbest: {ad:'Serbest metin (kendin yaz)', dil:null, metin:''},
+};
+// ---------- Modeller ----------
+const MODELLER = {
+  quran: {ad:"Kur'an'a özel (Tarteel base, ~106 MB, yalnız Arapça)", id:'Mustanad/whisper-base-ar-quran-onnx', dtype:'q8', device:'wasm', dilYok:true, yalnizAr:true,
+          not:"Kur'an okuması üzerine eğitilmiş base model. Türkçe tanımaz."},
+  base: {ad:'Çok dilli base (~80 MB, hızlı)', id:'onnx-community/whisper-base', dtype:'q8', device:'wasm',
+          not:'Arapça ve Türkçe; küçük, kalitesi sınırlı.'},
+  small:{ad:'Çok dilli small (~250 MB, daha iyi, yavaş)', id:'onnx-community/whisper-small', dtype:'q8', device:'wasm',
+          not:'Arapça ve Türkçe; base\'ten iyi. İlk indirme uzun sürer, işlem telefonda yavaş olabilir.'},
+  turbo:{ad:'Large-v3 turbo (WebGPU, ~600 MB+, deneysel)', id:'onnx-community/whisper-large-v3-turbo', dtype:{encoder_model:'fp16',decoder_model_merged:'q4'}, device:'webgpu',
+          not:'En iyi kalite; WebGPU ister ve çok bellek kullanır. Telefonda çalışmayabilir.'},
+};
+const $ = id => document.getElementById(id);
+for (const [k,m] of Object.entries(METINLER)) $('metin').add(new Option(m.ad,k));
+for (const [k,m] of Object.entries(MODELLER)) $('model').add(new Option(m.ad,k));
+try { const s=JSON.parse(localStorage.getItem('okumaTest')||'{}'); if(s.metin&&METINLER[s.metin]) $('metin').value=s.metin; if(s.model&&MODELLER[s.model]) $('model').value=s.model; } catch(e){}
+function ayarKaydet(){ try{localStorage.setItem('okumaTest',JSON.stringify({metin:$('metin').value,model:$('model').value}))}catch(e){} }
+
+function secili(){
+  const k=$('metin').value, m=METINLER[k];
+  if (k==='serbest') return {k, ad:'serbest', dil:$('serbestDil').value, metin:$('serbestMetin').value.trim()};
+  return {k, ad:m.ad, dil:m.dil, metin:m.metin};
+}
+function refGuncelle(){
+  const s=secili();
+  $('serbestKutu').hidden = s.k!=='serbest';
+  const r=$('refGoster'); r.className='ref'+(s.dil==='turkish'?' tr':''); r.textContent=s.metin||'—';
+  const md=MODELLER[$('model').value];
+  let not=md.not; if (md.yalnizAr && s.dil==='turkish') not+=' ⚠ Bu metin Türkçe; çok dilli bir model seç.';
+  $('modelNot').textContent=not; ayarKaydet();
+}
+['metin','model','serbestDil'].forEach(id=>$(id).addEventListener('change',refGuncelle));
+$('serbestMetin').addEventListener('input',refGuncelle);
+refGuncelle();
+
+// ---------- Normalleştirme ve hizalama ----------
+function normAr(w){
+  return w.replace(/[ً-ٰٟۖ-ۭـ]/g,'')   // hareke, üstün elif, durak işaretleri, tatvil
+          .replace(/[أإآٱ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه').replace(/ؤ/g,'و').replace(/ئ/g,'ي')
+          .replace(/[^ء-ي]/g,'');
+}
+function normTr(w){ return w.toLocaleLowerCase('tr').replace(/[^a-zçğıöşüâîû0-9]/g,'').replace(/â/g,'a').replace(/î/g,'i').replace(/û/g,'u'); }
+function kelimeler(metin,dil){
+  const f = dil==='arabic'?normAr:normTr;
+  return metin.split(/[\s۝]+/).map(w=>({g:w,n:f(w)})).filter(o=>o.n);
+}
+function lev(a,b){
+  const m=a.length,n=b.length; if(!m) return n; if(!n) return m;
+  let p=Array.from({length:n+1},(_,j)=>j);
+  for(let i=1;i<=m;i++){ const c=[i]; for(let j=1;j<=n;j++) c[j]=Math.min(p[j]+1,c[j-1]+1,p[j-1]+(a[i-1]===b[j-1]?0:1)); p=c; }
+  return p[n];
+}
+function benz(a,b){ if(a===b) return {d:'dogru',c:0}; const r=lev(a,b)/Math.max(a.length,b.length); return r<=0.34?{d:'yakin',c:0.35}:{d:'farkli',c:1}; }
+// Kelime düzeyinde hizalama: eşleşme/fark, eksik, fazla; ayrıca bitişik yazım farkı (1 referans = 2 duyulan ya da tersi).
+function hizala(R,H){
+  const m=R.length,n=H.length,INF=1e9;
+  const dp=Array.from({length:m+1},()=>new Float64Array(n+1).fill(INF)), bk=Array.from({length:m+1},()=>new Array(n+1));
+  dp[0][0]=0;
+  for(let i=0;i<=m;i++) for(let j=0;j<=n;j++){
+    const v=dp[i][j]; if(v>=INF) continue;
+    const t=(ii,jj,c,op)=>{ if(v+c<dp[ii][jj]){dp[ii][jj]=v+c;bk[ii][jj]={i,j,op};} };
+    if(i<m&&j<n){ const b=benz(R[i].n,H[j].n); t(i+1,j+1,b.c,{t:b.d,r:i,h:[j]}); }
+    if(i<m) t(i+1,j,1,{t:'eksik',r:i});
+    if(j<n) t(i,j+1,1,{t:'fazla',h:[j]});
+    if(i<m&&j+1<n){ const b=benz(R[i].n,H[j].n+H[j+1].n); if(b.d!=='farkli') t(i+1,j+2,b.c+0.1,{t:b.d,r:i,h:[j,j+1]}); }
+    if(i+1<m&&j<n){ const b=benz(R[i].n+R[i+1].n,H[j].n); if(b.d!=='farkli') t(i+2,j+1,b.c+0.1,{t:b.d,r:i,r2:i+1,h:[j]}); }
+  }
+  const ops=[]; let i=m,j=n; while(i||j){ const b=bk[i][j]; ops.push(b.op); i=b.i; j=b.j; } ops.reverse();
+  return ops;
+}
+
+// ---------- Kayıt ----------
+let kayitci=null, akis=null, parcalar=[], basla=0, zam=null, analiz=null, sesBlob=null, ses16=null, sesSn=0, sesKaynak='';
+async function kaydiBaslat(){
+  const islem=$('islem').checked;
+  akis=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:islem,noiseSuppression:islem,autoGainControl:true,channelCount:1}});
+  const ac=new AudioContext(), an=ac.createAnalyser(); an.fftSize=1024; ac.createMediaStreamSource(akis).connect(an);
+  const buf=new Float32Array(an.fftSize);
+  analiz={ac, t:setInterval(()=>{ an.getFloatTimeDomainData(buf); let s=0; for(const x of buf) s+=x*x; const db=20*Math.log10(Math.sqrt(s/buf.length)+1e-9); $('seviye').style.width=Math.max(0,Math.min(100,(db+60)*100/55))+'%'; },80)};
+  parcalar=[]; kayitci=new MediaRecorder(akis);
+  kayitci.ondataavailable=e=>{ if(e.data.size) parcalar.push(e.data); };
+  kayitci.onstop=()=>sesAl(new Blob(parcalar,{type:kayitci.mimeType||'audio/webm'}),'mikrofon'+(islem?'':' (işlemesiz)'));
+  kayitci.start(); basla=performance.now();
+  zam=setInterval(()=>{$('sure').textContent=((performance.now()-basla)/1000).toFixed(1).replace('.',',')+' sn';},100);
+  $('btnKayit').textContent='■ Kaydı bitir'; $('btnTani').disabled=true;
+}
+function kaydiBitir(){
+  kayitci.stop(); akis.getTracks().forEach(t=>t.stop()); clearInterval(zam);
+  if(analiz){ clearInterval(analiz.t); analiz.ac.close(); analiz=null; } $('seviye').style.width='0';
+  $('btnKayit').textContent='● Kaydı başlat';
+}
+$('btnKayit').onclick=async()=>{
+  try{ if(kayitci&&kayitci.state==='recording') kaydiBitir(); else await kaydiBaslat(); }
+  catch(e){ $('durum').textContent='Mikrofon açılamadı: '+e.message; }
+};
+$('dosya').onchange=e=>{ const f=e.target.files[0]; if(f) sesAl(f,'dosya: '+f.name); };
+
+async function sesAl(blob,kaynak){
+  sesBlob=blob; sesKaynak=kaynak;
+  const url=URL.createObjectURL(blob); $('dinle').src=url; $('dinle').hidden=false;
+  const ind=$('indir'); ind.href=url; ind.download='okuma_'+new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')+(blob.type.includes('mp4')?'.m4a':'.webm'); ind.hidden=kaynak.startsWith('dosya');
+  try{
+    const ac=new AudioContext(); const b=await ac.decodeAudioData(await blob.arrayBuffer()); ac.close();
+    const oc=new OfflineAudioContext(1,Math.ceil(b.duration*16000),16000); const s=oc.createBufferSource(); s.buffer=b; s.connect(oc.destination); s.start();
+    ses16=(await oc.startRendering()).getChannelData(0).slice(); sesSn=b.duration;
+    $('sure').textContent=sesSn.toFixed(1).replace('.',',')+' sn'; $('btnTani').disabled=false;
+    $('durum').textContent='Ses hazır ('+sesSn.toFixed(1)+' sn). "Tanı"ya bas.';
+  }catch(e){ $('durum').textContent='Ses çözülemedi: '+e.message; }
+}
+
+// ---------- Whisper (Web Worker, transformers.js) ----------
+const ISCI_KOD = `
+import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.0/dist/transformers.min.js';
+env.allowLocalModels = false;
+let boru = null, anahtar = '';
+self.onmessage = async (e) => {
+  const m = e.data;
+  try {
+    const k = m.id + '|' + m.device + '|' + JSON.stringify(m.dtype);
+    if (k !== anahtar) {
+      if (boru && boru.dispose) { try { await boru.dispose(); } catch (_) {} }
+      boru = null; anahtar = '';
+      const t0 = performance.now();
+      boru = await pipeline('automatic-speech-recognition', m.id, { dtype: m.dtype, device: m.device,
+        progress_callback: (p) => self.postMessage({ type: 'progress', p: { status: p.status, file: p.file, progress: p.progress, loaded: p.loaded, total: p.total } }) });
+      anahtar = k; self.postMessage({ type: 'yuklendi', ms: performance.now() - t0 });
+    }
+    const o = { chunk_length_s: 30, stride_length_s: 5 };
+    if (m.language) { o.language = m.language; o.task = 'transcribe'; }
+    const t1 = performance.now();
+    const out = await boru(m.audio, o);
+    self.postMessage({ type: 'sonuc', text: out.text, ms: performance.now() - t1 });
+  } catch (err) { self.postMessage({ type: 'hata', msg: String((err && err.message) || err) }); }
+};`;
+let isci=null;
+function isciAl(){ if(!isci) isci=new Worker(URL.createObjectURL(new Blob([ISCI_KOD],{type:'text/javascript'})),{type:'module'}); return isci; }
+
+const dosyaIlerleme={};
+$('btnTani').onclick=()=>{
+  const s=secili(), mk=$('model').value, md=MODELLER[mk];
+  if(!ses16){ return; }
+  if(!s.metin){ $('durum').textContent='Önce metni yaz.'; return; }
+  if(md.yalnizAr && s.dil==='turkish'){ $('durum').textContent="Kur'an modeli Türkçe tanımaz; çok dilli bir model seç."; return; }
+  if(md.device==='webgpu' && !navigator.gpu){ $('durum').textContent='Bu tarayıcıda WebGPU yok; başka model seç.'; return; }
+  $('btnTani').disabled=true; $('sonuc').hidden=true; $('durum').textContent='Model hazırlanıyor…';
+  for(const k in dosyaIlerleme) delete dosyaIlerleme[k];
+  const w=isciAl(); let yukMs=0;
+  w.onmessage=e=>{
+    const m=e.data;
+    if(m.type==='progress'){
+      const p=m.p; if(p.status==='progress'&&p.file){ dosyaIlerleme[p.file]=p; }
+      const sat=Object.values(dosyaIlerleme).filter(x=>x.total>1e6).map(x=>x.file.split('/').pop()+': '+Math.round(x.progress)+'% ('+(x.total/1e6).toFixed(0)+' MB)');
+      $('durum').textContent='Model indiriliyor (ilk sefer; sonra önbellekten gelir)…\n'+sat.join('\n');
+    } else if(m.type==='yuklendi'){ yukMs=m.ms; $('durum').textContent='Model yüklendi ('+(m.ms/1000).toFixed(1)+' sn). Tanınıyor… ('+sesSn.toFixed(0)+' sn ses)'; }
+    else if(m.type==='sonuc'){ $('btnTani').disabled=false; goster(s,mk,m.text,m.ms,yukMs); }
+    else if(m.type==='hata'){ $('btnTani').disabled=false; $('durum').textContent='Hata: '+m.msg; }
+  };
+  $('durum').textContent='Tanınıyor… ('+sesSn.toFixed(0)+' sn ses)';
+  w.postMessage({id:md.id,dtype:md.dtype,device:md.device,language:md.dilYok?null:s.dil,audio:ses16});
+};
+
+const denemeler=[];
+function goster(s,mk,metin,ms,yukMs){
+  const R=kelimeler(s.metin,s.dil), H=kelimeler(metin,s.dil), ops=hizala(R,H);
+  const say={dogru:0,yakin:0,farkli:0,eksik:0,fazla:0}; const kutu=$('hizali'); kutu.innerHTML=''; kutu.className='ref'+(s.dil==='turkish'?' tr':'');
+  const el=(t,ust,alt)=>{ const sp=document.createElement('span'); sp.className='w '+t; sp.textContent=ust; if(alt){const sm=document.createElement('small'); sm.textContent=alt; sp.appendChild(sm);} kutu.appendChild(sp); };
+  const fark=[];
+  for(const o of ops){
+    const refG = o.r!=null ? R[o.r].g+(o.r2!=null?' '+R[o.r2].g:'') : '';
+    const hypG = o.h ? o.h.map(j=>H[j].g).join(' ') : '';
+    const n = o.r2!=null?2:(o.r!=null?1:0);
+    if(o.t==='fazla'){ say.fazla++; el('fazla',hypG,'fazla'); fark.push('+'+hypG); continue; }
+    say[o.t]+=n;
+    if(o.t==='dogru') el('dogru',refG);
+    else if(o.t==='yakin'){ el('yakin',refG,hypG); fark.push(refG+'≈'+hypG); }
+    else if(o.t==='farkli'){ el('farkli',refG,hypG); fark.push(refG+'→'+hypG); }
+    else { el('eksik',refG,'eksik'); fark.push('-'+refG); }
+  }
+  const top=R.length, puan=top?Math.round(100*(say.dogru+say.yakin)/top):0;
+  $('puan').textContent=puan+'%';
+  $('puanAyr').textContent=` ${say.dogru} doğru · ${say.yakin} yakın · ${say.farkli} farklı · ${say.eksik} eksik · ${say.fazla} fazla (toplam ${top} kelime)`;
+  const h=$('ham'); h.className='hyp'+(s.dil==='turkish'?' tr':''); h.textContent=metin.trim()||'(boş)';
+  $('sonuc').hidden=false;
+  $('durum').textContent=`Tanıma ${(ms/1000).toFixed(1)} sn sürdü (${sesSn.toFixed(1)} sn ses, hız ×${(sesSn/(ms/1000)).toFixed(2)})`+(yukMs?`; model yükleme ${(yukMs/1000).toFixed(1)} sn`:'')+'.';
+  const d={saat:new Date().toLocaleTimeString('tr-TR'),metin:s.ad,model:mk,kaynak:sesKaynak,sesSn,isSn:ms/1000,puan,say,top,duyulan:metin.trim(),fark};
+  denemeler.push(d);
+  const tr=document.createElement('tr');
+  [d.saat,d.metin,d.model,d.kaynak+' · '+d.sesSn.toFixed(1)+' sn',d.isSn.toFixed(1)+' sn',`${puan}% (${say.dogru}+${say.yakin}/${top}, eksik ${say.eksik}, fazla ${say.fazla})`].forEach(x=>{const td=document.createElement('td');td.textContent=x;tr.appendChild(td);});
+  $('gecmis').prepend(tr);
+}
+$('btnKopya').onclick=async()=>{
+  const ua=navigator.userAgent;
+  const t=['Okuma testi 2026-11-13a · '+ua].concat(denemeler.map(d=>
+    `${d.saat} | ${d.metin} | ${d.model} | ${d.kaynak} ${d.sesSn.toFixed(1)} sn | işlem ${d.isSn.toFixed(1)} sn | ${d.puan}% doğru ${d.say.dogru} yakın ${d.say.yakin} farklı ${d.say.farkli} eksik ${d.say.eksik} fazla ${d.say.fazla} / ${d.top}\n  duyulan: ${d.duyulan}\n  farklar: ${d.fark.join(', ')||'-'}`)).join('\n');
+  try{ await navigator.clipboard.writeText(t); $('kopyaNot').textContent='Kopyalandı.'; }catch(e){ $('kopyaNot').textContent='Kopyalanamadı.'; }
+};
+</script>
+</body>
+</html>
